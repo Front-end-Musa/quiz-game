@@ -1,0 +1,122 @@
+<section class="party-hero">
+  <div class="hero-copy stack">
+    <p class="eyebrow">
+      <span class="status-dot" aria-hidden="true"></span> Вечер начинается с вашей компании
+    </p>
+    <h1>Собираемся.<br />Играем.<br /><span class="highlight-word">Зажигаем!</span></h1>
+    <p class="lead">
+      Один круг друзей. Десятки «я точно знаю!». Викторины, которые превращают обычный вечер в
+      маленькое соревнование.
+    </p>
+    <div class="actions">
+      <a appButton routerLink="/join">Играть <span aria-hidden="true">↗</span></a
+      ><a appButton variant="secondary" routerLink="/quizzes">Создать игру</a>
+    </div>
+    <p class="hero-footnote">
+      <span class="mini-avatars" aria-hidden="true"><i>А</i><i>Т</i><i>М</i></span> 8–15 друзей.
+      Один ведущий. Много эмоций.
+    </p>
+  </div>
+  <div
+    class="party-illustration"
+    role="img"
+    aria-label="Игровые карточки: вопрос, ответ и первое место"
+  >
+    <div class="circle-letter circle-a">А</div>
+    <div class="circle-letter circle-b">Б</div>
+    <div class="illustrated-question">
+      <span class="eyebrow">Вопрос на вечер</span><strong>Кто здесь<br />всё знает?</strong>
+      <div class="illustrated-options"><span>Вы?</span><span>Ваши друзья?</span></div>
+    </div>
+    <div class="score-ticket">
+      <span>Отличный вечер</span><strong>+1000</strong><span>очков настроения</span>
+    </div>
+    <div class="first-place"><span>Место</span><strong>1</strong></div>
+    <span class="illustration-note">Победитель один.<br />Впечатления — у всех.</span>
+  </div>
+</section>
+<div class="party-strip">
+  <span>Думайте быстро</span><span aria-hidden="true">✳</span><span>Играйте вместе</span
+  ><span aria-hidden="true">✳</span><span>Болейте за друзей</span>
+</div>
+<section class="section-block" aria-labelledby="featured-title">
+  <div class="section-heading">
+    <div>
+      <p class="eyebrow">Первая особенная тема</p>
+      <h2 id="featured-title">Знания, которыми дорожим</h2>
+    </div>
+    <app-badge tone="pending">Контент готовится</app-badge>
+  </div>
+  @if (featured.isLoading()) {
+    <app-loading-state label="Готовим знакомство с темой…" />
+  } @else if (featured.error()) {
+    <app-empty-state
+      title="Тема пока не загрузилась"
+      message="Все викторины можно посмотреть в каталоге."
+    />
+  } @else if (featured.value(); as quiz) {
+    <article class="featured-quiz">
+      <app-quiz-artwork kind="quran" />
+      <div class="stack">
+        <p class="eyebrow">Quran Challenge — Three Surahs</p>
+        <h3>{{ quiz.title }}</h3>
+        <p>
+          Худ (11), Юсуф (12), Нух (71). Спокойное внимание к смыслу и уважение к содержанию — в
+          кругу друзей.
+        </p>
+        <p class="muted">
+          Планируем 15 вопросов. Пока здесь только структура: содержание требует подготовки и
+          проверки.
+        </p>
+        <a appButton variant="secondary" [routerLink]="['/quiz', quiz.id]"
+          >Подробнее о теме <span aria-hidden="true">→</span></a
+        >
+      </div>
+    </article>
+  }
+</section>
+<section class="section-block" aria-labelledby="how-title">
+  <div class="section-heading">
+    <div>
+      <p class="eyebrow">Без длинных инструкций</p>
+      <h2 id="how-title">Три шага — и вы в кругу</h2>
+    </div>
+  </div>
+  <div class="steps">
+    <article>
+      <span class="step-number">01</span>
+      <h3>Найдите свою тему</h3>
+      <p>Ведущий выбирает викторину и настраивает игру под компанию.</p>
+    </article>
+    <article>
+      <span class="step-number">02</span>
+      <h3>Соберите друзей</h3>
+      <p>Код комнаты, имя — и вы в лобби. Ведущий управляет игрой вне зачёта.</p>
+    </article>
+    <article>
+      <span class="step-number">03</span>
+      <h3>Ловите момент</h3>
+      <p>В полной игре верные ответы и скорость приносят очки. В финале — один победитель!</p>
+    </article>
+  </div>
+</section>
+<section class="category-section section-block" aria-labelledby="categories-title">
+  <p class="eyebrow">Сегодня код. Завтра космос.</p>
+  <h2 id="categories-title">Любопытству тесно в одной теме</h2>
+  <p>Первые наборы уже в каталоге. Остальные направления — впереди.</p>
+  <div class="category-links">
+    @for (category of categories; track category; let i = $index) {
+      <a routerLink="/quizzes" [queryParams]="{ category }"
+        >{{ category }}
+        @if (i > 1) {
+          <small>скоро</small>
+        }
+        <span aria-hidden="true">↗</span></a
+      >
+    }
+  </div>
+</section>
+<aside class="prototype-note">
+  <strong>Сейчас знакомимся, скоро соревнуемся.</strong> В прототипе доступны каталог, настройки и
+  локальное лобби. <a routerLink="/lobby/DEMO22">Заглянуть в демокомнату →</a>
+</aside>

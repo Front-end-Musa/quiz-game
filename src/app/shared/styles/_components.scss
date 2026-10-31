@@ -1,0 +1,422 @@
+/* Native controls share one visual vocabulary across all features. */
+.button {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  gap: var(--space-5);
+  min-height: 50px;
+  padding: 0.8rem 1.5rem;
+  border: 2px solid var(--ink);
+  border-radius: 12px;
+  color: var(--ink);
+  background: var(--coral);
+  box-shadow: var(--shadow);
+  text-decoration: none;
+  font-weight: 800;
+  cursor: pointer;
+  transition:
+    transform var(--motion-fast),
+    box-shadow var(--motion-fast),
+    background var(--motion-fast);
+  text-align: center;
+}
+.button:hover:not(:disabled) {
+  transform: translate(-1px, -2px);
+  box-shadow: 5px 6px 0 var(--ink);
+}
+.button:active:not(:disabled) {
+  transform: translate(3px, 3px);
+  box-shadow: 1px 1px 0 var(--ink);
+}
+.button.secondary {
+  background: var(--surface);
+}
+.button.dark {
+  background: var(--ink);
+  color: var(--paper);
+}
+.button:disabled,
+.text-button:disabled {
+  opacity: 0.55;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+.text-button {
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  cursor: pointer;
+  padding: 0.75rem 0.25rem;
+  min-height: 44px;
+}
+.text-button:hover:not(:disabled) {
+  color: var(--focus);
+}
+input {
+  width: 100%;
+  min-height: 50px;
+  border: 1.5px solid var(--ink);
+  border-radius: 10px;
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface);
+  color: var(--ink);
+  transition: box-shadow var(--motion-fast);
+}
+input:hover {
+  box-shadow: 2px 2px 0 var(--line);
+}
+input.ng-invalid.ng-touched,
+input[aria-invalid='true'] {
+  border-color: var(--danger);
+}
+input:disabled {
+  background: var(--paper);
+  opacity: 0.7;
+}
+label {
+  font-weight: 800;
+  font-size: 0.9rem;
+}
+[role='alert'],
+.field-error {
+  color: var(--danger);
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.form-field small {
+  line-height: 1.5;
+}
+.badge {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--ink);
+  border-radius: 999px;
+  padding: 0.25rem 0.7rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  background: var(--paper);
+  line-height: 1.5;
+}
+.badge[data-tone='success'] {
+  color: var(--emerald);
+  background: var(--mint);
+  border-color: var(--emerald);
+}
+.badge[data-tone='pending'] {
+  background: var(--yellow);
+}
+.loading-state {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-7) 0;
+  color: var(--muted);
+}
+.loading-dot {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--ink);
+  background: var(--coral);
+  border-radius: 50%;
+  animation: load-pulse 1s ease-in-out infinite alternate;
+}
+@keyframes load-pulse {
+  to {
+    opacity: 0.3;
+    transform: scale(0.75);
+  }
+}
+.panel,
+.notice {
+  padding: var(--space-5);
+  border: 1.5px solid var(--ink);
+  border-radius: var(--radius);
+  margin-block: var(--space-5);
+}
+.panel {
+  background: var(--surface);
+}
+.notice {
+  background: var(--yellow);
+}
+.notice p {
+  margin-top: var(--space-2);
+  max-width: 75ch;
+}
+.inline-warning {
+  padding: var(--space-4);
+  border-left: 3px solid var(--ink);
+  background: var(--yellow);
+  font-size: 0.85rem;
+}
+.tile-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+}
+.quiz-facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+  width: 100%;
+  margin: 0;
+  padding: var(--space-4) 0;
+  border-block: 1px solid var(--line);
+}
+.quiz-facts dt {
+  font-size: 0.68rem;
+  color: var(--muted);
+}
+.quiz-facts dd {
+  font-size: 0.9rem;
+  font-weight: 800;
+  margin: 0.3rem 0 0;
+  overflow-wrap: anywhere;
+}
+.quiz-card {
+  height: 100%;
+  background: var(--surface);
+  border: 1.5px solid var(--ink);
+  border-radius: 18px;
+  overflow: hidden;
+  transition:
+    transform 180ms,
+    box-shadow 180ms;
+}
+.quiz-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 4px 6px 0 var(--ink);
+}
+.quiz-card-link {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  text-decoration: none;
+}
+.quiz-card-body {
+  padding: var(--space-5);
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.quiz-card h2 {
+  font-size: 1.6rem;
+}
+.quiz-card p {
+  font-size: 0.9rem;
+}
+.quiz-card app-quiz-facts {
+  margin-top: auto;
+}
+.card-action {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+  font-weight: 800;
+}
+.card-action > span {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  background: var(--yellow);
+  border: 1px solid var(--ink);
+  border-radius: 50%;
+}
+.quiz-art {
+  height: 220px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: var(--space-4);
+  overflow: hidden;
+  border-bottom: 1.5px solid var(--ink);
+}
+.quiz-art[data-kind='quran'] {
+  background: var(--emerald);
+  color: var(--on-emerald);
+}
+.book-art {
+  display: flex;
+  width: 205px;
+  height: 112px;
+  border: 2px solid var(--paper);
+  border-radius: 8px 18px 18px 8px;
+  box-shadow: 6px 6px 0 #ffffff30;
+  padding: 16px;
+  gap: 6px;
+  align-items: stretch;
+  transform: rotate(-5deg);
+}
+.book-art span {
+  display: grid;
+  place-items: center;
+  flex: 1;
+  font-size: 0.85rem;
+  border: 1px solid #ffffff70;
+  border-radius: 25px 25px 4px 4px;
+}
+.art-caption {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+.quiz-art[data-kind='code'] {
+  background: var(--violet);
+}
+.code-art {
+  font-family: monospace;
+  font-size: 3rem;
+  font-weight: 800;
+  border: 2px solid var(--ink);
+  padding: 6px 18px;
+  border-radius: 10px;
+  background: var(--paper);
+  box-shadow: 5px 5px 0 var(--ink);
+  transform: rotate(4deg);
+}
+.quiz-art[data-kind='world'] {
+  background: var(--blue);
+}
+.planet-art {
+  width: 108px;
+  height: 108px;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  font-size: 4rem;
+  font-weight: 900;
+  background: var(--yellow);
+  position: relative;
+  transform: rotate(10deg);
+}
+.planet-art::before {
+  content: '';
+  position: absolute;
+  width: 165px;
+  height: 45px;
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  transform: rotate(-28deg);
+}
+.planet-art span {
+  position: relative;
+  background: var(--yellow);
+  line-height: 1;
+}
+.step-number {
+  display: grid;
+  place-items: center;
+  border: 1.5px solid var(--ink);
+  border-radius: 50%;
+  width: 44px;
+  height: 44px;
+  background: var(--yellow);
+  font-size: 0.9rem;
+  font-weight: 900;
+  flex-shrink: 0;
+}
+.settings-list {
+  width: 100%;
+  margin: 0;
+}
+.settings-list > div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-block: var(--space-3);
+  border-bottom: 1px solid var(--line);
+  font-size: 0.9rem;
+}
+.settings-list dt {
+  color: var(--muted);
+}
+.settings-list dd {
+  margin: 0;
+  font-weight: 800;
+  text-align: right;
+}
+.room-code {
+  display: inline-block;
+  margin: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  background: var(--mint);
+  border: 2px solid var(--ink);
+  border-radius: 8px;
+  letter-spacing: 0.15em;
+  font-size: clamp(1.2rem, 5vw, 2rem);
+}
+.player-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  width: 100%;
+}
+.player-list li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding-block: var(--space-3);
+  border-bottom: 1px solid var(--violet);
+  flex-wrap: wrap;
+}
+.avatar {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--violet);
+}
+.table-scroll {
+  width: 100%;
+  overflow-x: auto;
+}
+table {
+  border-collapse: collapse;
+  width: 100%;
+  text-align: left;
+}
+caption {
+  text-align: left;
+  font-weight: 700;
+  padding-block: var(--space-3);
+}
+th,
+td {
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--violet);
+  white-space: nowrap;
+}
+.skip-link {
+  position: fixed;
+  top: 0;
+  left: 1rem;
+  transform: translateY(-150%);
+  padding: var(--space-3);
+  background: var(--yellow);
+  z-index: 10;
+}
+.skip-link:focus {
+  transform: translateY(0);
+}
+
+.quiz-card:focus-within {
+  outline: 3px solid var(--focus);
+  outline-offset: 5px;
+}

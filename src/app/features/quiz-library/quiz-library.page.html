@@ -1,0 +1,48 @@
+<app-page-header
+  eyebrow="На любой кругозор"
+  title="Во что сыграем?"
+  description="Выберите тему, в которой хочется блеснуть. Или ту, где интересно удивиться."
+/>
+<nav class="filter-bar" aria-label="Фильтр по категории">
+  <a
+    routerLink="/quizzes"
+    [class.selected]="!category()"
+    [attr.aria-current]="!category() ? 'true' : null"
+    >Все темы</a
+  >
+  @for (topic of categories(); track topic) {
+    <a
+      routerLink="/quizzes"
+      [queryParams]="{ category: topic }"
+      [class.selected]="category() === topic"
+      [attr.aria-current]="category() === topic ? 'true' : null"
+      >{{ topic }}</a
+    >
+  }
+</nav>
+@if (quizzes.isLoading()) {
+  <app-loading-state label="Собираем викторины…" />
+} @else if (quizzes.error()) {
+  <app-empty-state title="Не удалось загрузить каталог" message="Попробуйте обновить страницу." />
+} @else {
+  <div class="catalogue-heading">
+    <p>{{ category() || 'Вся коллекция' }}</p>
+    <span class="muted">Наборов: {{ filtered().length }}</span>
+  </div>
+  <div class="quiz-grid">
+    @for (quiz of filtered(); track quiz.id) {
+      <app-quiz-card [quiz]="quiz" />
+    } @empty {
+      <app-empty-state
+        title="Эта тема ещё впереди"
+        message="Готового набора пока нет. А пока найдём другую тему для вашей компании?"
+        link="/quizzes"
+        label="Показать все темы"
+      />
+    }
+  </div>
+  <p class="prototype-note">
+    «Демо» — небольшой набор для знакомства с платформой. «Скоро» — содержание ещё готовится; играть
+    в него пока нельзя.
+  </p>
+}

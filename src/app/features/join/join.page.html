@@ -1,0 +1,91 @@
+<div class="join-layout">
+  <section class="join-intro">
+    <app-page-header
+      eyebrow="Ваше место в кругу"
+      title="Заходите, мы ждём!"
+      description="Никаких анкет. Только код от ведущего и имя, за которое будут болеть друзья."
+    />
+    <div class="join-illustration" aria-hidden="true">
+      <span>А</span><span>Вы</span><span>М</span><strong>Вместе интереснее.</strong>
+    </div>
+    <p class="muted">
+      Ведущий ещё не выбрал тему? <a class="text-link" routerLink="/quizzes">Помогите ему →</a>
+    </p>
+  </section>
+  <section class="join-panel">
+    @if (success(); as joined) {
+      <div class="stack join-success" role="status" aria-live="polite">
+        <span class="success-stamp" aria-hidden="true">✓</span>
+        <p class="eyebrow">Место в компании занято</p>
+        <h2>Вы в кругу!</h2>
+        <p>
+          <strong>{{ joined.name }}</strong
+          >, вы присоединились к комнате <strong>{{ joined.code }}</strong
+          >. Друзья уже в лобби.
+        </p>
+        <a appButton [routerLink]="['/lobby', joined.code]"
+          >Войти в лобби <span aria-hidden="true">→</span></a
+        >
+      </div>
+    } @else {
+      <form class="stack" [formGroup]="form" (ngSubmit)="join()" novalidate>
+        <div>
+          <p class="eyebrow">Один код — одна компания</p>
+          <h2>Присоединиться к игре</h2>
+        </div>
+        <app-form-field
+          fieldId="room-code"
+          label="Код комнаты"
+          hint="Шесть латинских букв или цифр от ведущего."
+          [error]="fieldError('code')"
+          ><input
+            id="room-code"
+            class="code-input"
+            formControlName="code"
+            maxlength="6"
+            autocapitalize="characters"
+            autocomplete="off"
+            spellcheck="false"
+            placeholder="DEMO22"
+            (blur)="normalizeCode()"
+            [attr.aria-invalid]="!!fieldError('code')"
+            [attr.aria-describedby]="
+              'room-code-hint' + (fieldError('code') ? ' room-code-error' : '')
+            "
+        /></app-form-field>
+        <app-form-field
+          fieldId="player-name"
+          label="Как вас представить?"
+          hint="От 1 до 24 символов. Выберите узнаваемое имя."
+          [error]="fieldError('name')"
+          ><input
+            id="player-name"
+            formControlName="name"
+            maxlength="24"
+            autocomplete="nickname"
+            placeholder="Ваше имя"
+            [attr.aria-invalid]="!!fieldError('name')"
+            [attr.aria-describedby]="
+              'player-name-hint' + (fieldError('name') ? ' player-name-error' : '')
+            "
+        /></app-form-field>
+        <button appButton type="submit" [disabled]="busy()">
+          {{ busy() ? 'Заходим…' : 'Я в игре!' }} <span aria-hidden="true">↗</span>
+        </button>
+        @if (error()) {
+          <p role="alert">{{ error() }}</p>
+        }
+        <div class="demo-helper">
+          <span>Хотите просто посмотреть?</span
+          ><button class="text-button" type="button" (click)="useDemo()" [disabled]="busy()">
+            Подставить демокод
+          </button>
+        </div>
+      </form>
+    }
+    <p class="join-local-note">
+      Локальное демо: комната должна быть создана в этом браузере. Для знакомства доступна DEMO22.
+      Подключение с телефонов появится позже.
+    </p>
+  </section>
+</div>

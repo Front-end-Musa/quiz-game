@@ -1,0 +1,27 @@
+<a class="skip-link" href="#main-content">Перейти к содержимому</a>
+<header class="site-header">
+  <div class="header-inner">
+    <a class="brand" routerLink="/" aria-label="Квиз Круг — на главную"
+      ><span class="brand-mark" aria-hidden="true">К</span>Квиз Круг<span class="badge"
+        >Демо</span
+      ></a
+    >
+    <nav aria-label="Главная навигация">
+      <a routerLink="/quizzes" routerLinkActive="active" ariaCurrentWhenActive="page">Викторины</a>
+      <a routerLink="/leaderboard" routerLinkActive="active" ariaCurrentWhenActive="page"
+        >Результаты</a
+      >
+      <a class="nav-join" routerLink="/join" routerLinkActive="active" ariaCurrentWhenActive="page"
+        >Войти по коду</a
+      >
+    </nav>
+  </div>
+</header>
+<main id="main-content" class="container" tabindex="-1"><router-outlet /></main>
+<footer class="site-footer container">
+  <strong>В кругу друзей интереснее.</strong>
+  <p>
+    Локальный прототип: комнаты сохраняются в этом браузере, а роль — в этой вкладке. Подключение с
+    телефонов появится позже.
+  </p>
+</footer>

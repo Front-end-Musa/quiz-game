@@ -1,0 +1,135 @@
+<a class="back-link" [routerLink]="['/quiz', quizId()]">← О викторине</a>
+<app-page-header
+  eyebrow="Теперь вы ведущий"
+  title="Соберём компанию"
+  description="Чуть быстрее? Чуть азартнее? Настройте игру так, как нравится вашим друзьям."
+/>
+@if (quiz.isLoading()) {
+  <app-loading-state label="Готовим комнату…" />
+} @else if (quiz.error()) {
+  <app-empty-state
+    title="Не удалось загрузить тему"
+    message="Вернитесь в каталог и попробуйте снова."
+  />
+} @else if (quiz.value(); as selected) {
+  <div class="content-with-aside">
+    <form class="settings-form" [formGroup]="form" (ngSubmit)="create()" novalidate>
+      <div class="form-section-heading">
+        <span class="step-number">01</span>
+        <div>
+          <h2>Ритм и правила</h2>
+          <p class="muted">{{ selected.title }}</p>
+        </div>
+      </div>
+      <app-form-field
+        fieldId="host-nickname"
+        label="Никнейм ведущего"
+        hint="Вы управляете игрой и не участвуете в зачёте."
+        [error]="
+          form.controls.hostNickname.touched && form.controls.hostNickname.invalid
+            ? 'Введите имя от 1 до 24 символов.'
+            : ''
+        "
+        ><input
+          id="host-nickname"
+          formControlName="hostNickname"
+          maxlength="24"
+          aria-describedby="host-nickname-hint host-nickname-error"
+          [attr.aria-invalid]="
+            form.controls.hostNickname.touched && form.controls.hostNickname.invalid
+          "
+      /></app-form-field>
+      <div class="settings-fields">
+        @for (field of fields; track field.key) {
+          <app-form-field
+            [fieldId]="field.key"
+            [label]="field.label"
+            [hint]="
+              field.key === 'questionCount'
+                ? 'В этом наборе доступно: ' + selected.questionIds.length + '. ' + field.hint
+                : field.hint
+            "
+            [error]="fieldError(field.key)"
+          >
+            <input
+              type="number"
+              [id]="field.key"
+              [formControlName]="field.key"
+              [min]="field.min"
+              [max]="field.key === 'questionCount' ? selected.questionIds.length : field.max"
+              step="1"
+              [attr.aria-invalid]="!!fieldError(field.key)"
+              [attr.aria-describedby]="
+                field.key + '-hint' + (fieldError(field.key) ? ' ' + field.key + '-error' : '')
+              "
+            />
+          </app-form-field>
+        }
+      </div>
+      @if (
+        form.hasError('bonusTooHigh') &&
+        (form.controls.speedBonusPoints.touched || form.controls.pointsPerCorrectAnswer.touched)
+      ) {
+        <p class="field-error" role="alert">
+          Бонус за скорость не должен превышать очки за верный ответ.
+        </p>
+      }
+      @if (selected.status === 'placeholder') {
+        <p class="inline-warning">
+          Контент ещё не проверен. Создание комнаты для этой темы недоступно.
+        </p>
+      }
+      @if (
+        form.hasError('minimumTooHigh') &&
+        (form.controls.minPlayers.touched || form.controls.maxPlayers.touched)
+      ) {
+        <p class="field-error" role="alert">
+          Минимум игроков не должен превышать максимум комнаты.
+        </p>
+      }
+      <div class="form-actions">
+        <button appButton type="submit" [disabled]="busy() || selected.status === 'placeholder'">
+          {{ busy() ? 'Создаём…' : 'Создать локальную комнату' }}
+          <span aria-hidden="true">↗</span></button
+        ><button type="button" class="text-button" (click)="reset()" [disabled]="busy()">
+          Сбросить настройки
+        </button>
+      </div>
+      @if (error()) {
+        <p role="alert">{{ error() }}</p>
+      }
+    </form>
+    <aside class="setup-summary stack">
+      <p class="eyebrow">План на вечер</p>
+      <h2>Хорошая игра начинается здесь</h2>
+      <dl class="settings-list">
+        <div>
+          <dt>Вопросов</dt>
+          <dd>{{ values().questionCount ?? '—' }}</dd>
+        </div>
+        <div>
+          <dt>Примерное время</dt>
+          <dd>{{ form.valid ? '≈ ' + estimate() + ' мин' : '—' }}</dd>
+        </div>
+        <div>
+          <dt>Игроков</dt>
+          <dd>до {{ values().maxPlayers ?? '—' }}</dd>
+        </div>
+        <div>
+          <dt>За один ответ</dt>
+          <dd>
+            {{ values().pointsPerCorrectAnswer ?? '—' }} + {{ values().speedBonusPoints ?? '—' }}
+          </dd>
+        </div>
+      </dl>
+      <p>Вы — ведущий. Управляете игрой и болеете за друзей, но не участвуете в зачёте.</p>
+      <small>Время включает ориентир на обсуждение ответов. Реальный темп задаёт ведущий.</small>
+      <p class="prototype-note">
+        Пока создаём лобби и сохраняем настройки в этой вкладке. Раунды и начисление очков появятся
+        позже.
+      </p>
+    </aside>
+  </div>
+} @else {
+  <app-empty-state title="Тема не найдена" message="Выберите викторину из каталога." />
+}

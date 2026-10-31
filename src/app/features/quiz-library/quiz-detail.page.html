@@ -1,0 +1,121 @@
+<a class="back-link" routerLink="/quizzes">← Все викторины</a>
+@if (detail.isLoading()) {
+  <app-loading-state label="Открываем викторину…" />
+} @else if (detail.error()) {
+  <app-empty-state title="Не удалось открыть викторину" message="Попробуйте ещё раз из каталога." />
+} @else if (detail.value(); as data) {
+  @if (data.quiz; as quiz) {
+    <div class="preview-hero">
+      <div>
+        <app-badge [tone]="quiz.status === 'placeholder' ? 'pending' : 'success'">{{
+          quiz.status === 'placeholder'
+            ? 'Контент не проверен'
+            : quiz.status === 'demo'
+              ? 'Доступно · демо'
+              : 'Доступно'
+        }}</app-badge
+        ><app-page-header
+          [eyebrow]="quiz.topic"
+          [title]="quiz.title"
+          [description]="quiz.description"
+        /><app-quiz-facts [quiz]="quiz" />
+      </div>
+      <app-quiz-artwork
+        [kind]="
+          quiz.id === 'quran-three-surahs'
+            ? 'quran'
+            : quiz.id === 'programming-basics'
+              ? 'code'
+              : 'world'
+        "
+      />
+    </div>
+    <div class="content-with-aside">
+      <div class="stack content-main">
+        <section class="rules-section stack">
+          <p class="eyebrow">Главное — играть вместе</p>
+          <h2>Как устроена игра</h2>
+          <ol class="rule-list">
+            <li>
+              <strong>Один ведущий — весь ритм игры.</strong> Ведущий открывает вопросы, показывает
+              ответы и не соревнуется.
+            </li>
+            <li>
+              <strong>Один вопрос — один ответ.</strong> Выберите вариант и подтвердите его до конца
+              таймера.
+            </li>
+            <li>
+              <strong>Точность плюс скорость.</strong> За верный ответ — базовые очки, за быстрый —
+              бонус.
+            </li>
+            <li>
+              <strong>Один победитель.</strong> При равенстве очков учитываем число верных ответов,
+              время и порядок входа.
+            </li>
+          </ol>
+        </section>
+        <section class="stack">
+          <h2>{{ quiz.status === 'placeholder' ? 'Что готовим' : 'Знакомство с вопросами' }}</h2>
+          @if (quiz.status === 'placeholder') {
+            <p>
+              Пятнадцать мест для будущих проверенных вопросов: по пять на каждую суру.
+              Подтверждённого содержания и ссылок на аяты пока нет.
+            </p>
+          } @else {
+            @for (question of data.questions.slice(0, 2); track question.id; let index = $index) {
+              <article class="question-preview">
+                <span class="eyebrow">Пример {{ index + 1 }}</span>
+                <h3>{{ question.prompt }}</h3>
+              </article>
+            }
+          }
+        </section>
+      </div>
+      <aside class="setup-summary stack">
+        <p class="eyebrow">Ваша игра — ваш темп</p>
+        <h2>Соберём комнату?</h2>
+        <dl class="settings-list">
+          <div>
+            <dt>Вопросов</dt>
+            <dd>{{ quiz.questionIds.length }}</dd>
+          </div>
+          <div>
+            <dt>На ответ</dt>
+            <dd>{{ quiz.defaultTimeLimitSeconds }} сек</dd>
+          </div>
+          <div>
+            <dt>За верный ответ</dt>
+            <dd>1 000 очков</dd>
+          </div>
+          <div>
+            <dt>Бонус за скорость</dt>
+            <dd>до 500</dd>
+          </div>
+          <div>
+            <dt>Игроков</dt>
+            <dd>до 15</dd>
+          </div>
+        </dl>
+        <p class="muted">
+          Все настройки можно изменить перед созданием. Время ориентировочное: темп задаёт ведущий.
+        </p>
+        @if (quiz.status === 'placeholder') {
+          <p class="inline-warning">
+            Сначала — проверка содержания. Создание комнаты пока недоступно.
+          </p>
+          <a appButton variant="secondary" routerLink="/quizzes">Выбрать доступную тему</a>
+        } @else {
+          <a appButton [routerLink]="['/create-room', quiz.id]"
+            >Создать игру <span aria-hidden="true">↗</span></a
+          >
+        }
+        <small>Сейчас доступны настройки и лобби. Живые раунды появятся позже.</small>
+      </aside>
+    </div>
+  } @else {
+    <app-empty-state
+      title="Викторина не найдена"
+      message="Похоже, такой темы пока нет. Выберите другую."
+    />
+  }
+}

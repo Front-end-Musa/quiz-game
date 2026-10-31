@@ -1,0 +1,234 @@
+@if (snapshot() === undefined) {
+  <app-loading-state label="Ищем комнату…" />
+} @else if (snapshot(); as state) {
+  <header class="lobby-heading">
+    <div class="stack">
+      <p class="eyebrow">
+        {{
+          hostView()
+            ? 'Вы — ведущий'
+            : state.viewerRole === 'visitor'
+              ? 'Просмотр комнаты'
+              : 'Ваш круг друзей'
+        }}
+      </p>
+      <h1>Все в сборе?</h1>
+      <h2>{{ quiz.value()?.title ?? 'Загружаем тему…' }}</h2>
+      <p>
+        Ведущий: <strong>{{ state.room.hostNickname }}</strong> · вне зачёта
+      </p>
+    </div>
+    <div class="code-ticket">
+      <span class="eyebrow">Код комнаты</span
+      ><strong class="room-code">{{ state.room.code }}</strong
+      ><button type="button" class="text-button" (click)="copyCode()">Скопировать код</button>
+    </div>
+  </header>
+  @if (!state.persistent) {
+    <p class="inline-warning">
+      Хранилище браузера недоступно. Изменения сохраняются только до обновления этой вкладки.
+    </p>
+  }
+  @if (development && state.viewerRole === 'host') {
+    <button class="text-button" type="button" (click)="previewPlayer.set(!previewPlayer())">
+      {{ previewPlayer() ? 'Вернуться к управлению ведущего' : 'Предпросмотр экрана игрока' }}
+    </button>
+  }
+  @if (previewPlayer()) {
+    <p class="prototype-note">
+      Предпросмотр: ваша роль ведущего не меняется. Игровые очки вам не начисляются.
+    </p>
+  }
+  <div class="content-with-aside">
+    <section class="panel lobby-players">
+      <div class="section-heading">
+        <h2>Игроки: {{ state.players.length }} / {{ state.room.settings.maxPlayers }}</h2>
+        <app-badge tone="pending">{{
+          state.room.phase === 'lobby' ? 'Ждём компанию' : 'Игра началась'
+        }}</app-badge>
+      </div>
+      <p class="muted">
+        Минимум для старта: {{ state.room.settings.minPlayers }}. Ведущий не участвует в
+        соревновании.
+      </p>
+      @if (mockCount()) {
+        <p class="mock-disclosure">
+          Из них {{ mockCount() }} — mock-игроки, а не подключённые пользователи.
+        </p>
+      }
+      <ul class="player-list">
+        @for (player of state.players; track player.id) {
+          <li>
+            <span class="avatar" aria-hidden="true">{{ player.displayName.slice(0, 1) }}</span>
+            <div class="player-name">
+              <strong>{{ player.displayName }}</strong>
+              @if (player.id === state.viewerPlayerId) {
+                <small>Это вы</small>
+              }
+            </div>
+            @if (player.isMock) {
+              <app-badge>MOCK · симуляция</app-badge>
+            } @else {
+              <small>Локальный игрок</small>
+            }
+            @if (hostView() && state.room.phase === 'lobby') {
+              <button
+                class="text-button remove-player"
+                type="button"
+                [attr.aria-label]="'Удалить игрока ' + player.displayName"
+                [disabled]="busy()"
+                (click)="remove(player.id)"
+              >
+                Удалить
+              </button>
+            }
+          </li>
+        } @empty {
+          <li class="empty-roster">
+            <strong>Пока тихо. Самое время позвать друзей!</strong>
+            <p>Участники появятся здесь после входа в комнату.</p>
+          </li>
+        }
+      </ul>
+      @if (!hostView()) {
+        <div class="waiting-banner" role="status">
+          <strong>{{
+            state.room.phase === 'lobby'
+              ? 'Устраивайтесь поудобнее — ждём ведущего.'
+              : 'Ведущий уже запустил игру.'
+          }}</strong>
+          <p>Только {{ state.room.hostNickname }} может начать игру.</p>
+        </div>
+      }
+      @if (state.viewerRole === 'visitor') {
+        <a appButton variant="secondary" routerLink="/join">Войти как игрок</a>
+      }
+    </section>
+    <aside class="setup-summary stack">
+      <p class="eyebrow">Правила вашего вечера</p>
+      <h2>Настройки комнаты</h2>
+      <dl class="settings-list">
+        <div>
+          <dt>Вопросов</dt>
+          <dd>{{ state.room.settings.questionCount }}</dd>
+        </div>
+        <div>
+          <dt>На ответ</dt>
+          <dd>{{ state.room.settings.timeLimitSeconds }} сек</dd>
+        </div>
+        <div>
+          <dt>За верный ответ</dt>
+          <dd>
+            {{ state.room.settings.pointsPerCorrectAnswer }} очков + до
+            {{ state.room.settings.speedBonusPoints }} бонуса
+          </dd>
+        </div>
+        <div>
+          <dt>Для старта</dt>
+          <dd>{{ state.room.settings.minPlayers }}–{{ state.room.settings.maxPlayers }} игроков</dd>
+        </div>
+      </dl>
+      @if (hostView() && state.room.phase === 'lobby') {
+        <label for="lobby-minimum">Минимум игроков</label
+        ><input
+          id="lobby-minimum"
+          type="number"
+          min="2"
+          [max]="state.room.settings.maxPlayers"
+          step="1"
+          [formControl]="minimum"
+          aria-describedby="minimum-help"
+        /><small id="minimum-help"
+          >От 2 до {{ state.room.settings.maxPlayers }}. Для дружеской компании рекомендуем
+          8–15.</small
+        ><button
+          appButton
+          variant="secondary"
+          type="button"
+          [disabled]="busy()"
+          (click)="applyMinimum()"
+        >
+          Сохранить минимум</button
+        ><button
+          appButton
+          type="button"
+          [disabled]="busy() || state.players.length < state.room.settings.minPlayers"
+          (click)="start()"
+        >
+          Начать игру <span aria-hidden="true">↗</span>
+        </button>
+        <p role="status">
+          {{
+            state.players.length < state.room.settings.minPlayers
+              ? 'Для старта не хватает игроков: ' +
+                (state.room.settings.minPlayers - state.players.length)
+              : 'Все условия выполнены. Можно начинать!'
+          }}
+        </p>
+      }
+      <small
+        >Пока запускается первый раунд без приёма ответов и подсчёта очков. Это локальный
+        прототип.</small
+      >
+    </aside>
+  </div>
+  @if (error()) {
+    <p class="inline-warning" role="alert">{{ error() }}</p>
+  }
+  @if (notice()) {
+    <p class="lobby-notice" role="status">{{ notice() }}</p>
+  }
+  @if (development && hostView() && state.room.phase === 'lobby') {
+    <section class="dev-tools" aria-labelledby="dev-title">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Только разработка</p>
+          <h2 id="dev-title">Симулятор игроков</h2>
+        </div>
+        <app-badge>DEV · MOCK</app-badge>
+      </div>
+      <p>Это тестовые участники. Они не подключены к комнате и не отправляют ответы.</p>
+      <form class="simulator-form" (submit)="$event.preventDefault(); addMock()">
+        <div class="stack">
+          <label for="mock-nickname">Никнейм mock-игрока</label
+          ><input
+            id="mock-nickname"
+            [formControl]="nickname"
+            maxlength="24"
+            placeholder="Например, Ловкий Кот"
+            [attr.aria-invalid]="nickname.touched && nickname.invalid"
+          />
+          @if (nickname.touched && nickname.invalid) {
+            <p class="field-error" role="alert">Введите имя от 1 до 24 символов.</p>
+          }
+        </div>
+        <div class="actions">
+          <button
+            appButton
+            variant="secondary"
+            type="submit"
+            [disabled]="busy() || state.players.length >= state.room.settings.maxPlayers"
+          >
+            Добавить mock-игрока</button
+          ><button class="text-button" type="button" (click)="randomNickname()" [disabled]="busy()">
+            Случайное имя</button
+          ><button
+            class="text-button"
+            type="button"
+            (click)="resetMocks()"
+            [disabled]="busy() || !mockCount()"
+          >
+            Сбросить mock-игроков
+          </button>
+        </div>
+      </form>
+    </section>
+  }
+} @else {
+  <app-empty-state
+    title="Комната не найдена"
+    message="Проверьте код или создайте свою комнату. Локальные комнаты доступны только в этом браузере."
+    link="/quizzes"
+    label="Создать игру"
+  />
+}

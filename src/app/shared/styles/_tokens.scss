@@ -1,0 +1,30 @@
+/* Semantic tokens are shared by all features. System fonts keep the demo offline. */
+:root {
+  --paper: #fff9ed;
+  --surface: #ffffff;
+  --ink: #25213b;
+  --muted: #615b6a;
+  --coral: #ff927d;
+  --yellow: #ffdb70;
+  --mint: #bce8ce;
+  --violet: #ded0fa;
+  --blue: #d9e9ff;
+  --emerald: #185d4d;
+  --on-emerald: #fff9ed;
+  --line: #d9d3c9;
+  --danger: #a42b35;
+  --focus: #4922b5;
+  --font-body: 'Trebuchet MS', 'Arial', sans-serif;
+  --font-display: 'Arial Rounded MT Bold', 'Trebuchet MS', 'Arial', sans-serif;
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+  --space-8: 4rem;
+  --radius: 16px;
+  --shadow: 4px 4px 0 var(--ink);
+  --motion-fast: 150ms;
+}
