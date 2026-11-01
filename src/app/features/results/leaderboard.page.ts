@@ -10,7 +10,10 @@ import { EmptyState } from '../../shared/ui/empty-state';
   template: `<header class="page-heading">
       <p class="eyebrow">Каждая компания — своя история</p>
       <h1>Таблица результатов</h1>
-      <p class="lead">Рейтинг внутри каждой игры. Очки разных викторин не смешиваем.</p>
+      <p class="lead">
+        Завершённые игры с вашим участием. Рейтинг внутри каждой игры. Очки разных викторин не
+        смешиваем.
+      </p>
     </header>
     @if (results.isLoading()) {
       <p role="status">Загружаем таблицы…</p>
@@ -21,11 +24,18 @@ import { EmptyState } from '../../shared/ui/empty-state';
         <section class="panel stack">
           <div class="tile-meta">
             <h2>Комната {{ result.roomCode }}</h2>
-            <span class="badge">{{ result.isDemo ? 'Демопример' : 'Игра завершена' }}</span>
+            <span class="badge">{{
+              result.isFixture
+                ? 'Демопример'
+                : result.isDemo
+                  ? 'Локальная демоигра'
+                  : 'Игра завершена'
+            }}</span>
           </div>
-          <app-leaderboard-table [entries]="result.standings" /><a
-            class="text-link"
-            [routerLink]="['/results', result.roomCode]"
+          <app-leaderboard-table
+            [entries]="result.standings"
+            [questionCount]="result.questionCount"
+          /><a class="text-link" [routerLink]="['/results', result.roomCode]"
             >Открыть результаты →</a
           >
         </section>

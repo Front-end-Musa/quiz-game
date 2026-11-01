@@ -4,6 +4,21 @@
   title="Соберём компанию"
   description="Чуть быстрее? Чуть азартнее? Настройте игру так, как нравится вашим друзьям."
 />
+@if (firebase) {
+  <section class="panel stack" aria-label="Учётная запись ведущего">
+    <p>Ведущий входит через Google. Игрокам регистрация не нужна.</p>
+    @if (firebase.user(); as user) {
+      <p>{{ user.email ?? 'Гостевой вход' }}</p>
+      <small>UID: {{ user.uid }}</small>
+    }
+    <button appButton type="button" (click)="firebase.google()" [disabled]="busy()">Войти через Google</button>
+  </section>
+}
+@if (defaults.error()) {
+  <p role="alert">Не удалось загрузить настройки новых игр.
+    <button type="button" class="text-button" (click)="defaults.reload()">Повторить</button>
+  </p>
+}
 @if (quiz.isLoading()) {
   <app-loading-state label="Готовим комнату…" />
 } @else if (quiz.error()) {
@@ -46,7 +61,7 @@
             [label]="field.label"
             [hint]="
               field.key === 'questionCount'
-                ? 'В этом наборе доступно: ' + selected.questionIds.length + '. ' + field.hint
+                ? 'Доступно для игры: ' + availableQuestions() + '. ' + field.hint
                 : field.hint
             "
             [error]="fieldError(field.key)"
@@ -56,7 +71,7 @@
               [id]="field.key"
               [formControlName]="field.key"
               [min]="field.min"
-              [max]="field.key === 'questionCount' ? selected.questionIds.length : field.max"
+              [max]="field.key === 'questionCount' ? availableQuestions() : field.max"
               step="1"
               [attr.aria-invalid]="!!fieldError(field.key)"
               [attr.aria-describedby]="
@@ -74,9 +89,22 @@
           Бонус за скорость не должен превышать очки за верный ответ.
         </p>
       }
-      @if (selected.status === 'placeholder') {
+      <section class="stack" aria-label="Вопросы комнаты">
+        <h2>Вопросы вашей игры</h2>
+        @if (!customMode()) {
+          <p>Вы можете выбрать порядок и изменить текст, варианты и правильные ответы только для своей комнаты.</p>
+          <button appButton variant="secondary" type="button" [disabled]="busy()" (click)="customizeQuestions()">
+            {{ selected.status === 'placeholder' ? 'Добавить свои вопросы' : 'Выбрать и изменить вопросы' }}
+          </button>
+        } @else if (initialQuestions(); as content) {
+          <app-room-question-editor [initialContent]="content" [quizId]="selected.id" [disabled]="busy()" (contentChange)="questionsChanged($event)" />
+          <p>В игру попадут первые {{ form.controls.questionCount.value }} вопросов в этом порядке.</p>
+          <button type="button" class="text-button" [disabled]="busy()" (click)="usePublishedQuestions()">Использовать исходный набор</button>
+        }
+      </section>
+      @if (selected.status === 'placeholder' && !customMode()) {
         <p class="inline-warning">
-          Контент ещё не проверен. Создание комнаты для этой темы недоступно.
+          В исходном наборе пока только пустые места для вопросов и нет ключей ответов. Добавьте свои проверенные вопросы или выберите другую тему.
         </p>
       }
       @if (
@@ -88,8 +116,8 @@
         </p>
       }
       <div class="form-actions">
-        <button appButton type="submit" [disabled]="busy() || selected.status === 'placeholder'">
-          {{ busy() ? 'Создаём…' : 'Создать локальную комнату' }}
+        <button appButton type="submit" [disabled]="busy() || selected.status === 'placeholder' && !customMode()">
+          {{ busy() ? 'Создаём…' : firebase ? 'Создать комнату' : 'Создать локальную комнату' }}
           <span aria-hidden="true">↗</span></button
         ><button type="button" class="text-button" (click)="reset()" [disabled]="busy()">
           Сбросить настройки
@@ -125,8 +153,11 @@
       <p>Вы — ведущий. Управляете игрой и болеете за друзей, но не участвуете в зачёте.</p>
       <small>Время включает ориентир на обсуждение ответов. Реальный темп задаёт ведущий.</small>
       <p class="prototype-note">
-        Пока создаём лобби и сохраняем настройки в этой вкладке. Раунды и начисление очков появятся
-        позже.
+        @if (firebase) {
+          Друзья присоединяются по коду со своих устройств. Держите страницу ведущего открытой во время игры.
+        } @else {
+          Игра и настройки сохраняются в этом браузере. Друзья могут присоединиться в других вкладках.
+        }
       </p>
     </aside>
   </div>

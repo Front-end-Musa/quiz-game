@@ -1,3 +1,5 @@
+import { DEVELOPMENT_TOOLS } from '../../ports/development-tools';
+import { MockPlayerSimulator } from './mock-player-simulator';
 import { BrowserRoomStore, ROOM_STORE } from './room-store';
 import { Provider } from '@angular/core';
 import { QUIZ_REPOSITORY } from '../../ports/quiz-repository';
@@ -14,6 +16,8 @@ export function provideMocks(): Provider[] {
     BrowserRoomStore,
     { provide: ROOM_STORE, useExisting: BrowserRoomStore },
     MockRoomGateway,
+    MockPlayerSimulator,
+    { provide: DEVELOPMENT_TOOLS, useExisting: MockPlayerSimulator },
     { provide: ROOM_GATEWAY, useExisting: MockRoomGateway },
     { provide: RESULT_REPOSITORY, useClass: MockResultRepository },
   ];

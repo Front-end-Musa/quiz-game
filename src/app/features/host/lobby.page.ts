@@ -1,27 +1,29 @@
-import { Component, computed, effect, inject, isDevMode, resource, signal } from '@angular/core';
+import { Component, computed, effect, inject, resource, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { map, switchMap } from 'rxjs';
 import { ROOM_GATEWAY, CommandResult } from '../../core/ports/room-gateway';
 import { QUIZ_REPOSITORY } from '../../core/ports/quiz-repository';
-import { MockPlayerSimulator } from '../../core/infrastructure/mock/mock-player-simulator';
+import { DEVELOPMENT_TOOLS } from '../../core/ports/development-tools';
 import { EmptyState } from '../../shared/ui/empty-state';
 import { Button } from '../../shared/ui/button';
 import { Badge } from '../../shared/ui/badge';
 import { LoadingState } from '../../shared/ui/loading-state';
+import { RoomQuestionEditor } from '../../shared/ui/room-question-editor';
+import { RoomQuestionSet, roomQuestionErrors } from '../../core/domain/room-question-set';
 
 @Component({
   selector: 'app-lobby-page',
-  imports: [RouterLink, ReactiveFormsModule, EmptyState, Button, Badge, LoadingState],
+  imports: [RouterLink, ReactiveFormsModule, EmptyState, Button, Badge, LoadingState, RoomQuestionEditor],
   templateUrl: './lobby.page.html',
 })
 export class LobbyPage {
   private readonly rooms = inject(ROOM_GATEWAY);
   private readonly quizzes = inject(QUIZ_REPOSITORY);
-  private readonly simulator = inject(MockPlayerSimulator);
+  private readonly simulator = inject(DEVELOPMENT_TOOLS, { optional: true });
   private readonly router = inject(Router);
-  readonly development = isDevMode();
+  readonly development = this.simulator?.enabled ?? false;
   readonly previewPlayer = signal(false);
   readonly code = toSignal(
     inject(ActivatedRoute).paramMap.pipe(map((params) => params.get('roomCode') ?? '')),
@@ -43,6 +45,9 @@ export class LobbyPage {
   readonly busy = signal(false);
   readonly error = signal('');
   readonly notice = signal('');
+  readonly initialQuestions = signal<RoomQuestionSet | null>(null);
+  readonly editedQuestions = signal<RoomQuestionSet | null>(null);
+  readonly questionsDirty = signal(false);
   readonly nickname = new FormControl('', {
     nonNullable: true,
     validators: [Validators.required, Validators.maxLength(24), Validators.pattern(/\S/)],
@@ -79,7 +84,7 @@ export class LobbyPage {
           'not-enough-players': 'Игроков пока недостаточно для старта.',
           'game-started': 'Игра уже началась. Состав лобби заблокирован.',
           'invalid-settings': 'Минимум должен быть целым числом от 2 до максимума комнаты.',
-          'storage-unavailable': 'Не удалось сохранить изменение в браузере. Попробуйте ещё раз.',
+          'storage-unavailable': 'Не удалось сохранить изменение. Проверьте соединение и попробуйте ещё раз.',
         };
         this.error.set(
           messages[result.error] ?? 'Не удалось выполнить действие. Обновите состояние комнаты.',
@@ -92,13 +97,19 @@ export class LobbyPage {
     }
   }
   async randomNickname() {
-    this.nickname.setValue(await this.simulator.nickname(this.code()));
+    if (!this.simulator?.enabled) return;
+    try {
+      this.nickname.setValue(await this.simulator.nickname(this.code()));
+    } catch {
+      this.error.set('Не удалось подобрать имя. Введите его вручную.');
+    }
   }
   async addMock() {
+    if (!this.simulator?.enabled) return;
     this.nickname.markAsTouched();
     if (this.nickname.invalid) return;
     await this.run(
-      () => this.simulator.add(this.code(), this.nickname.value),
+      () => this.simulator!.add(this.code(), this.nickname.value),
       'Mock-игрок добавлен.',
     );
     if (!this.error()) this.nickname.reset('');
@@ -107,8 +118,9 @@ export class LobbyPage {
     return this.run(() => this.rooms.removePlayer(this.code(), id), 'Игрок удалён из лобби.');
   }
   resetMocks() {
+    if (!this.simulator?.enabled) return;
     return this.run(
-      () => this.simulator.reset(this.code()),
+      () => this.simulator!.reset(this.code()),
       'Симулированные игроки удалены. Локальные участники сохранены.',
     );
   }
@@ -118,8 +130,45 @@ export class LobbyPage {
       'Минимум игроков обновлён.',
     );
   }
+  playLocally() {
+    if (!this.simulator?.enabled) return;
+    if (this.questionsDirty()) { this.error.set('Сначала сохраните вопросы или отмените изменения.'); return; }
+    return this.run(() => this.simulator!.playLocally(this.code()), 'Локальная игра началась.');
+  }
   start() {
+    if (this.questionsDirty()) { this.error.set('Сначала сохраните вопросы или отмените изменения.'); return; }
     return this.run(() => this.rooms.start(this.code()), 'Игра началась!');
+  }
+  async editQuestions() {
+    if (this.busy()) return;
+    this.busy.set(true); this.error.set(''); this.notice.set('');
+    try {
+      const result = await this.rooms.editableRoomQuestions(this.code());
+      if (!result.ok) { this.error.set('Вопросы может редактировать только создатель комнаты.'); return; }
+      this.initialQuestions.set(result.value); this.editedQuestions.set(null); this.questionsDirty.set(false);
+    } catch { this.error.set('Вопросы не загрузились. Проверьте соединение.'); }
+    finally { this.busy.set(false); }
+  }
+  cancelQuestions() {
+    this.initialQuestions.set(null); this.editedQuestions.set(null); this.questionsDirty.set(false); this.error.set('');
+  }
+  async saveQuestions() {
+    const content = this.editedQuestions();
+    const quizId = this.snapshot()?.room.quizId;
+    if (this.busy() || !content || !quizId) return;
+    const errors = roomQuestionErrors(content, quizId);
+    if (errors.length) { this.error.set(errors.join(' ')); return; }
+    this.busy.set(true); this.error.set(''); this.notice.set('');
+    try {
+      const result = await this.rooms.updateQuestions(this.code(), content);
+      if (!result.ok) {
+        this.error.set(result.error === 'game-started' ? 'Игра уже началась. Вопросы заблокированы.' :
+          result.error === 'invalid-settings' ? 'Вопросы изменились в другой вкладке. Откройте редактор заново.' : 'Не удалось сохранить вопросы.');
+        return;
+      }
+      this.cancelQuestions(); this.notice.set('Вопросы сохранены только для этой комнаты. Можно начинать игру.');
+    } catch { this.error.set('Не удалось сохранить вопросы. Проверьте соединение.'); }
+    finally { this.busy.set(false); }
   }
   async copyCode() {
     try {

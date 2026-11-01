@@ -64,14 +64,14 @@ it('blocks placeholder room creation in the page', async () => {
   const harness = await RouterTestingHarness.create('/create-room/quran-three-surahs');
   await harness.fixture.whenStable();
   harness.detectChanges();
-  expect(harness.routeNativeElement?.querySelector('button')?.disabled).toBe(true);
+  expect(harness.routeNativeElement?.querySelector<HTMLButtonElement>('button[type="submit"]')?.disabled).toBe(true);
 });
 
 it('creates a local room from the form and navigates to its lobby', async () => {
   const harness = await RouterTestingHarness.create('/create-room/general-knowledge');
   await harness.fixture.whenStable();
   harness.detectChanges();
-  harness.routeNativeElement?.querySelector('button')?.click();
+  harness.routeNativeElement?.querySelector<HTMLButtonElement>('button[type="submit"]')?.click();
   await harness.fixture.whenStable();
   harness.detectChanges();
   expect(harness.routeNativeElement?.textContent).toContain('Все в сборе?');
@@ -183,7 +183,7 @@ it('rejects invalid counts and bonus combinations with actionable form feedback'
   await harness.fixture.whenStable();
   harness.detectChanges();
   fill(harness, 'questionCount', '4');
-  fill(harness, 'pointsPerCorrectAnswer', '100');
+  fill(harness, 'pointsPerCorrectAnswer', '10');
   submit(harness);
   await harness.fixture.whenStable();
   harness.detectChanges();

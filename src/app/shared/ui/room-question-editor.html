@@ -1,0 +1,34 @@
+<div class="room-editor stack" [formGroup]="form" (input)="onInput($event)" (change)="onInput($event)">
+  <p>Эти вопросы используются только в вашей комнате. Можно менять формулировки, варианты, ключи и порядок. После начала игры редактирование закрывается.</p>
+  <div class="stack" formArrayName="questions">
+    @for (question of questions.controls; track question; let i = $index) {
+      <fieldset class="stack" [formGroupName]="i" [disabled]="disabled()"><legend>Вопрос {{ i + 1 }}</legend>
+        <label>Текст вопроса<textarea formControlName="prompt" maxlength="2000"></textarea></label>
+        <div class="options-grid" formArrayName="options">
+          @for (option of question.controls.options.controls; track option; let j = $index) {
+            <label>Вариант {{ j + 1 }}<input [formControlName]="j" maxlength="500" /></label>
+          }
+        </div>
+        <label>Правильный вариант<select formControlName="correctOptionId"><option value="">Выберите ответ</option>
+          <option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select></label>
+        <label>Почему этот ответ верный<textarea formControlName="explanation" maxlength="4000"></textarea></label>
+        <label>Источник или ссылка (необязательно)<input formControlName="reference" maxlength="1000" /></label>
+        <div class="editor-actions"><button type="button" class="text-button" [disabled]="i === 0" (click)="move(i, -1)">↑ Выше</button>
+          <button type="button" class="text-button" [disabled]="i === questions.length - 1" (click)="move(i, 1)">↓ Ниже</button>
+          <button type="button" class="text-button" (click)="remove(i)">Убрать из игры</button></div>
+      </fieldset>
+    } @empty { <p>Готовых вопросов пока нет. Добавьте свой первый вопрос и заполните все варианты и объяснение.</p> }
+  </div>
+  <button type="button" class="text-button" [disabled]="disabled() || questions.length >= 15" (click)="add()">+ Новый вопрос ({{ questions.length }} / 15)</button>
+  @if (removedQuestions().length) {
+    <details><summary>Вернуть вопрос из набора</summary><div class="stack">
+      @for (question of removedQuestions(); track question.id) {
+        <button class="text-button" type="button" [disabled]="disabled() || questions.length >= 15" (click)="restore(question.id)">{{ question.prompt }}</button>
+      }
+    </div></details>
+  }
+  <label class="check"><input id="room-content-reviewed" type="checkbox" formControlName="reviewed" [attr.disabled]="disabled() ? '' : null" />Я проверил вопросы, правильные ответы и объяснения. Для религиозных вопросов проверены источники.</label>
+  <details><summary>Что проверить перед игрой</summary>
+    @for (message of errors(); track $index) { <p>{{ message }}</p> } @empty { <p>Все вопросы заполнены и отмечены как проверенные.</p> }
+  </details>
+</div>

@@ -8,6 +8,7 @@ import { PageHeader } from '../../shared/ui/page-header';
 import { LoadingState } from '../../shared/ui/loading-state';
 import { QuizArtwork } from '../../shared/ui/quiz-artwork';
 import { QuizFacts } from '../../shared/ui/quiz-facts';
+import { OwnerAccess } from '../../core/infrastructure/firebase/owner-access';
 
 @Component({
   selector: 'app-quiz-detail-page',
@@ -24,6 +25,7 @@ import { QuizFacts } from '../../shared/ui/quiz-facts';
   templateUrl: './quiz-detail.page.html',
 })
 export class QuizDetailPage {
+  readonly owner = inject(OwnerAccess, { optional: true });
   readonly quizId = input.required<string>();
   private readonly repository = inject(QUIZ_REPOSITORY);
   readonly detail = resource({

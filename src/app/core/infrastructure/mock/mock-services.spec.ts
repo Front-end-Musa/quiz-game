@@ -163,7 +163,7 @@ it.each([
   { questionCount: 1.5 },
   { timeLimitSeconds: 4 },
   { timeLimitSeconds: 121 },
-  { pointsPerCorrectAnswer: 99 },
+  { pointsPerCorrectAnswer: 0 },
   { pointsPerCorrectAnswer: 5001 },
   { speedBonusPoints: -1 },
   { speedBonusPoints: 1001 },

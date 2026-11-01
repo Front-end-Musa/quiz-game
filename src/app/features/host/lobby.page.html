@@ -1,6 +1,9 @@
 @if (snapshot() === undefined) {
   <app-loading-state label="Ищем комнату…" />
 } @else if (snapshot(); as state) {
+  @if (state.connectionStatus === 'cached') {
+    <p role="status">Ожидаем соединения. Показано последнее сохранённое состояние комнаты.</p>
+  }
   <header class="lobby-heading">
     <div class="stack">
       <p class="eyebrow">
@@ -69,7 +72,7 @@
             @if (player.isMock) {
               <app-badge>MOCK · симуляция</app-badge>
             } @else {
-              <small>Локальный игрок</small>
+              <small>{{ state.connectionStatus ? 'Игрок' : 'Локальный игрок' }}</small>
             }
             @if (hostView() && state.room.phase === 'lobby') {
               <button
@@ -152,7 +155,7 @@
         ><button
           appButton
           type="button"
-          [disabled]="busy() || state.players.length < state.room.settings.minPlayers"
+          [disabled]="busy() || questionsDirty() || state.players.length < state.room.settings.minPlayers"
           (click)="start()"
         >
           Начать игру <span aria-hidden="true">↗</span>
@@ -167,11 +170,26 @@
         </p>
       }
       <small
-        >Пока запускается первый раунд без приёма ответов и подсчёта очков. Это локальный
-        прототип.</small
+        >Таймер, ответы, очки и финальный рейтинг. Следующий вопрос
+        открывает ведущий.</small
       >
     </aside>
   </div>
+  @if (hostView() && state.room.phase === 'lobby') {
+    <section class="panel stack" aria-label="Редактирование вопросов комнаты">
+      <h2>Вопросы комнаты</h2>
+      <p>Выбирайте порядок, добавляйте свои вопросы и меняйте ответы до старта. Общая викторина останется прежней.</p>
+      @if (initialQuestions(); as content) {
+        <app-room-question-editor [initialContent]="content" [quizId]="state.room.quizId" [disabled]="busy()"
+          (contentChange)="editedQuestions.set($event)" (dirtyChange)="questionsDirty.set($event)" />
+        <div class="form-actions"><button appButton type="button" [disabled]="busy()" (click)="saveQuestions()">Сохранить вопросы комнаты</button>
+          <button class="text-button" type="button" [disabled]="busy()" (click)="cancelQuestions()">Отменить изменения</button></div>
+        @if (questionsDirty()) { <p role="status">Есть несохранённые вопросы. Сохраните их перед началом игры.</p> }
+      } @else {
+        <button appButton variant="secondary" type="button" [disabled]="busy()" (click)="editQuestions()">Изменить вопросы и ответы</button>
+      }
+    </section>
+  }
   @if (error()) {
     <p class="inline-warning" role="alert">{{ error() }}</p>
   }
@@ -188,6 +206,19 @@
         <app-badge>DEV · MOCK</app-badge>
       </div>
       <p>Это тестовые участники. Они не подключены к комнате и не отправляют ответы.</p>
+      <div class="practice-entry stack">
+        <button
+          appButton
+          type="button"
+          [disabled]="busy() || questionsDirty() || state.players.length >= state.room.settings.maxPlayers"
+          (click)="playLocally()"
+        >
+          Играть самому · DEV</button
+        ><small
+          >Создаст отдельного игрока для вас, заполнит минимум mock-игроками и запустит игру.
+          Ведущий остаётся вне зачёта.</small
+        >
+      </div>
       <form class="simulator-form" (submit)="$event.preventDefault(); addMock()">
         <div class="stack">
           <label for="mock-nickname">Никнейм mock-игрока</label
@@ -227,7 +258,7 @@
 } @else {
   <app-empty-state
     title="Комната не найдена"
-    message="Проверьте код или создайте свою комнату. Локальные комнаты доступны только в этом браузере."
+    message="Войдите по коду через страницу присоединения или создайте свою комнату."
     link="/quizzes"
     label="Создать игру"
   />

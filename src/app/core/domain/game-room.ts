@@ -1,5 +1,4 @@
-export type GamePhase =
-  'lobby' | 'question_open' | 'answers_locked' | 'reveal' | 'finished' | 'cancelled';
+export type GamePhase = 'lobby' | 'question' | 'reveal' | 'finished' | 'cancelled';
 
 export interface RoomSettings {
   readonly questionCount: number;
@@ -17,6 +16,8 @@ export interface GameRoom {
   readonly quizId: string;
   readonly quizVersion: number;
   readonly questionIds: readonly string[];
+  readonly hasCustomQuestions?: boolean;
+  readonly contentRevision?: number;
   readonly hostId: string;
   readonly hostNickname: string;
   readonly nextJoinOrder: number;
@@ -26,6 +27,7 @@ export interface GameRoom {
   readonly createdAt: number;
   readonly revision: number;
   readonly currentRound: {
+    readonly id: string;
     readonly questionId: string;
     readonly index: number;
     readonly openedAt: number;

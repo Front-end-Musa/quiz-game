@@ -3,10 +3,11 @@
   <div class="header-inner">
     <a class="brand" routerLink="/" aria-label="Квиз Круг — на главную"
       ><span class="brand-mark" aria-hidden="true">К</span>Квиз Круг<span class="badge"
-        >Демо</span
+        >{{ firebase ? 'Онлайн' : 'Демо' }}</span
       ></a
     >
     <nav aria-label="Главная навигация">
+      @if (owner?.allowed()) { <a routerLink="/admin">Управление</a> }
       <a routerLink="/quizzes" routerLinkActive="active" ariaCurrentWhenActive="page">Викторины</a>
       <a routerLink="/leaderboard" routerLinkActive="active" ariaCurrentWhenActive="page"
         >Результаты</a
@@ -17,11 +18,19 @@
     </nav>
   </div>
 </header>
-<main id="main-content" class="container" tabindex="-1"><router-outlet /></main>
+<main id="main-content" class="container" tabindex="-1">
+  @if (firebase?.error()) {
+    <p role="alert" class="panel">{{ firebase.error() }}</p>
+  }
+  <router-outlet />
+</main>
 <footer class="site-footer container">
   <strong>В кругу друзей интереснее.</strong>
   <p>
-    Локальный прототип: комнаты сохраняются в этом браузере, а роль — в этой вкладке. Подключение с
-    телефонов появится позже.
+    @if (firebase) {
+      Играйте с разных устройств. Для входа в комнату нужны код ведущего и интернет.
+    } @else {
+      Локальный прототип: комнаты сохраняются в этом браузере, а роль — в этой вкладке.
+    }
   </p>
 </footer>

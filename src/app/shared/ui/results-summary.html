@@ -1,0 +1,139 @@
+@if (winner(); as first) {
+  <section class="winner-banner" aria-labelledby="winner-heading">
+    <div class="winner-confetti" aria-hidden="true">
+      @for (piece of confetti; track piece) {
+        <i [style.--piece]="piece"></i>
+      }
+    </div>
+    <span class="winner-medal" aria-hidden="true">1</span>
+    <p class="eyebrow">Первое место · комната {{ result().roomCode }}</p>
+    <h1 id="winner-heading">{{ first.displayName }}</h1>
+    <p class="winner-copy">Вот это игра! Сегодня ваш круг знает своего победителя.</p>
+    @if (first.isMock) {
+      <app-badge>MOCK · симулированный участник</app-badge>
+    }
+    <div class="winner-facts">
+      <div>
+        <strong>{{ first.totalPoints | number }}</strong
+        ><span>очков</span>
+      </div>
+      <div>
+        <strong>{{ first.correctAnswers }} / {{ result().questionCount }}</strong
+        ><span>верных ответов</span>
+      </div>
+      <div>
+        <strong>{{ stats(first, result().questionCount).accuracy }}%</strong><span>точность</span>
+      </div>
+    </div>
+  </section>
+} @else {
+  <section class="notice">
+    <h1>Игра завершена!</h1>
+    <p>В этой игре нет участников для определения победителя.</p>
+  </section>
+}
+<p class="result-disclosure">
+  {{
+    result().isFixture
+      ? 'Демонстрационные результаты: это пример, а не сыгранная сессия.'
+      : 'Локальная демоигра. Mock-участники явно отмечены в рейтинге.'
+  }}
+  @if (result().questionCount < result().plannedQuestionCount) {
+    Игра завершена досрочно: {{ result().questionCount }} из
+    {{ result().plannedQuestionCount }} вопросов.
+  }
+</p>
+@if (me(); as player) {
+  <section class="personal-result">
+    <div>
+      <p class="eyebrow">Ваш результат</p>
+      <h2>{{ player.displayName }}</h2>
+    </div>
+    <strong>Место {{ player.rank }} · {{ player.totalPoints | number }} очков</strong>
+  </section>
+}
+<section class="rankings-section stack">
+  <div class="section-heading">
+    <div>
+      <p class="eyebrow">Каждый ответ — часть истории</p>
+      <h2>Финальные результаты</h2>
+    </div>
+    <span class="badge">Вопросов: {{ result().questionCount }}</span>
+  </div>
+  <app-leaderboard-table
+    [entries]="result().standings"
+    [questionCount]="result().questionCount"
+    [highlightPlayerId]="viewerPlayerId()"
+  />
+  <p class="ranking-rules">
+    При равных очках: больше верных ответов, меньше суммарное время верных ответов, затем более
+    ранний вход в лобби.
+  </p>
+</section>
+<section class="player-statistics stack">
+  <h2>Как сыграла компания</h2>
+  <p class="muted">
+    Точность — доля верных ответов среди всех завершённых вопросов, включая пропуски.
+  </p>
+  @for (player of result().standings; track player.playerId) {
+    <details class="player-stat">
+      <summary>
+        <span
+          >{{ player.displayName }}
+          @if (player.isMock) {
+            <span class="badge">MOCK</span>
+          }</span
+        ><span>{{ stats(player, result().questionCount).accuracy }}% · статистика</span>
+      </summary>
+      <dl class="statistics-grid">
+        <div>
+          <dt>Ответов отправлено</dt>
+          <dd>{{ player.answeredQuestions }}</dd>
+        </div>
+        <div>
+          <dt>Верных</dt>
+          <dd>{{ player.correctAnswers }}</dd>
+        </div>
+        <div>
+          <dt>Неверных</dt>
+          <dd>{{ stats(player, result().questionCount).incorrect }}</dd>
+        </div>
+        <div>
+          <dt>Без ответа</dt>
+          <dd>{{ stats(player, result().questionCount).unanswered }}</dd>
+        </div>
+        <div>
+          <dt>Среднее время верного ответа</dt>
+          <dd>
+            @if (player.correctAnswers > 0) {
+              <span
+                >{{
+                  player.correctResponseTimeMs / player.correctAnswers / 1000 | number: '1.0-1'
+                }}
+                сек</span
+              >
+            } @else {
+              <span>—</span>
+            }
+          </dd>
+        </div>
+      </dl>
+    </details>
+  }
+</section>
+<div class="result-actions">
+  <button appButton type="button" [disabled]="busy()" (click)="playAgain.emit()">
+    {{ busy() ? 'Собираем новую комнату…' : 'Сыграть ещё' }}
+    <span aria-hidden="true">↗</span></button
+  ><a appButton variant="secondary" routerLink="/">На главную</a>
+  @if (showDetailsLink()) {
+    <a class="text-link" [routerLink]="['/results', result().roomCode]">Страница результатов →</a>
+  }
+</div>
+<p class="muted replay-note">
+  Повтор создаст новую комнату с прежними настройками. Этот результат останется в истории.
+</p>
+@if (error()) {
+  <p role="alert">{{ error() }}</p>
+  <a class="text-link" routerLink="/quizzes">Выбрать другую викторину →</a>
+}

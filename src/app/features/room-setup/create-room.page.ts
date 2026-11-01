@@ -17,6 +17,11 @@ import { PageHeader } from '../../shared/ui/page-header';
 import { LoadingState } from '../../shared/ui/loading-state';
 import { FormField } from '../../shared/ui/form-field';
 import { durationMinutes } from '../../shared/ui/quiz-presentation';
+import { FirebaseConnection } from '../../core/infrastructure/firebase/firebase-connection';
+import { GameDefaultsRepository } from '../../core/infrastructure/firebase/game-defaults.repository';
+import { defaultsForQuiz } from '../../core/domain/admin-quiz';
+import { RoomQuestionEditor } from '../../shared/ui/room-question-editor';
+import { RoomQuestionSet, roomQuestionErrors, selectedRoomQuestions } from '../../core/domain/room-question-set';
 
 const integer: ValidatorFn = (control) =>
   Number.isInteger(control.value) ? null : { integer: true };
@@ -36,10 +41,14 @@ const numeric = (value: number, min: number, max: number) =>
     PageHeader,
     LoadingState,
     FormField,
+    RoomQuestionEditor,
   ],
   templateUrl: './create-room.page.html',
 })
 export class CreateRoomPage {
+  readonly firebase = inject(FirebaseConnection, { optional: true });
+  private readonly defaultsRepository = inject(GameDefaultsRepository, { optional: true });
+  readonly defaults = resource({ loader: () => this.defaultsRepository?.get() ?? Promise.resolve(null) });
   readonly quizId = input.required<string>();
   private readonly quizzes = inject(QUIZ_REPOSITORY);
   private readonly rooms = inject(ROOM_GATEWAY);
@@ -50,6 +59,10 @@ export class CreateRoomPage {
   });
   readonly busy = signal(false);
   readonly error = signal('');
+  readonly customMode = signal(false);
+  readonly initialQuestions = signal<RoomQuestionSet | null>(null);
+  readonly editedQuestions = signal<RoomQuestionSet | null>(null);
+  readonly availableQuestions = computed(() => this.customMode() ? this.editedQuestions()?.questions.length ?? 0 : this.quiz.hasValue() ? this.quiz.value()?.questionIds.length ?? 0 : 0);
   readonly form = new FormGroup(
     {
       hostNickname: new FormControl('Ведущий', {
@@ -59,8 +72,8 @@ export class CreateRoomPage {
       minPlayers: numeric(2, 2, 15),
       questionCount: numeric(1, 1, 15),
       timeLimitSeconds: numeric(20, 5, 120),
-      pointsPerCorrectAnswer: numeric(1000, 100, 5000),
-      speedBonusPoints: numeric(500, 0, 5000),
+      pointsPerCorrectAnswer: numeric(100, 1, 5000),
+      speedBonusPoints: numeric(50, 0, 5000),
       maxPlayers: numeric(15, 2, 15),
     },
     {
@@ -89,7 +102,7 @@ export class CreateRoomPage {
       label: 'Количество вопросов',
       min: 1,
       max: 15,
-      hint: 'Возьмём первые вопросы набора, сохранив их порядок.',
+      hint: 'Возьмём первые вопросы в выбранном вами порядке. Состав и тексты можно изменить ниже.',
     },
     {
       key: 'timeLimitSeconds',
@@ -101,9 +114,9 @@ export class CreateRoomPage {
     {
       key: 'pointsPerCorrectAnswer',
       label: 'Очки за верный ответ',
-      min: 100,
+      min: 1,
       max: 5000,
-      hint: 'От 100 до 5 000. Неверный ответ — без штрафа.',
+      hint: 'От 1 до 5 000. Неверный ответ — без штрафа.',
     },
     {
       key: 'speedBonusPoints',
@@ -123,49 +136,92 @@ export class CreateRoomPage {
 
   constructor() {
     effect(() => {
+      if (this.quiz.error() || this.defaults.error()) return;
       const quiz = this.quiz.value();
-      if (quiz) {
+      const defaults = this.defaults.value();
+      if (quiz && !this.defaults.isLoading()) {
         this.form.controls.questionCount.setValidators([
           Validators.required,
           Validators.min(1),
           Validators.max(quiz.questionIds.length),
           integer,
         ]);
-        this.form.reset({ ...defaultRoomSettings(quiz), hostNickname: 'Ведущий' });
+        this.form.reset({ ...(defaultsForQuiz(quiz, defaults ?? null) ?? defaultRoomSettings(quiz)), hostNickname: 'Ведущий' });
         this.error.set('');
+        this.customMode.set(false); this.initialQuestions.set(null); this.editedQuestions.set(null);
       }
+    });
+    effect(() => {
+      const available = this.availableQuestions();
+      this.form.controls.questionCount.setValidators([Validators.required, Validators.min(1), Validators.max(available), integer]);
+      this.form.controls.questionCount.updateValueAndValidity({ emitEvent: false });
     });
   }
 
   fieldError(key: keyof typeof this.form.controls): string {
     const control = this.form.controls[key];
     if (!control.touched || control.valid) return '';
+    if (key === 'questionCount' && this.availableQuestions() < 1) return 'Добавьте хотя бы один вопрос.';
     if (key === 'questionCount')
-      return `Введите целое число от 1 до ${this.quiz.value()?.questionIds.length ?? 1}.`;
+      return `Введите целое число от 1 до ${this.availableQuestions()}.`;
     const field = this.fields.find((f) => f.key === key)!;
     return `Введите целое число от ${field.min} до ${field.max}.`;
   }
 
   reset() {
     const quiz = this.quiz.value();
-    if (quiz) this.form.reset({ ...defaultRoomSettings(quiz), hostNickname: 'Ведущий' });
+    if (quiz) this.form.reset({ ...(defaultsForQuiz(quiz, this.defaults.value() ?? null) ?? defaultRoomSettings(quiz)), hostNickname: 'Ведущий' });
+    this.error.set('');
+    this.customMode.set(false); this.initialQuestions.set(null); this.editedQuestions.set(null);
+  }
+
+  async customizeQuestions() {
+    const quiz = this.quiz.value();
+    if (!quiz || this.busy()) return;
+    this.busy.set(true); this.error.set('');
+    try {
+      const result = await this.rooms.editableQuizQuestions(quiz.id, quiz.version);
+      if (!result.ok) { this.error.set('Чтобы редактировать вопросы, войдите под разрешённой учётной записью ведущего.'); return; }
+      if (this.quiz.value()?.id !== quiz.id) return;
+      this.customMode.set(true); this.initialQuestions.set(result.value);
+    } catch { this.error.set('Не удалось открыть вопросы. Проверьте соединение.'); }
+    finally { this.busy.set(false); }
+  }
+  questionsChanged(content: RoomQuestionSet) {
+    const previous = this.editedQuestions()?.questions.length;
+    this.editedQuestions.set(content);
+    if (previous !== content.questions.length) this.form.controls.questionCount.setValue(content.questions.length);
+  }
+  usePublishedQuestions() {
+    this.customMode.set(false); this.initialQuestions.set(null); this.editedQuestions.set(null);
+    const quiz = this.quiz.value();
+    if (quiz) this.form.controls.questionCount.setValue((defaultsForQuiz(quiz, this.defaults.value() ?? null) ?? defaultRoomSettings(quiz)).questionCount);
     this.error.set('');
   }
 
   async create() {
     if (this.busy()) return;
+    if (this.defaults.isLoading() || this.defaults.error()) {
+      this.error.set('Не удалось загрузить настройки игры. Обновите настройки и повторите действие.'); return;
+    }
     this.form.markAllAsTouched();
-    if (this.form.invalid || this.quiz.value()?.status === 'placeholder') return;
+    if (this.form.invalid || this.quiz.value()?.status === 'placeholder' && !this.customMode()) return;
+    const content = this.customMode() && this.editedQuestions()
+      ? selectedRoomQuestions(this.editedQuestions()!, this.form.controls.questionCount.value) : undefined;
+    if (this.customMode() && !content) { this.error.set('Сначала добавьте вопросы для комнаты.'); return; }
+    if (content && roomQuestionErrors(content, this.quizId()).length) { this.error.set(roomQuestionErrors(content, this.quizId()).join(' ')); return; }
     this.busy.set(true);
     this.error.set('');
     try {
       const { hostNickname, ...settings } = this.form.getRawValue();
-      const result = await this.rooms.create(this.quizId(), settings, hostNickname);
+      const result = await this.rooms.create(this.quizId(), settings, hostNickname, content);
       if (result.ok) await this.router.navigate(['/lobby', result.value.code]);
       else
         this.error.set(
           result.error === 'invalid-settings'
             ? 'Проверьте настройки комнаты: одно из значений недопустимо.'
+            : result.error === 'forbidden'
+              ? 'Войдите через Google под разрешённой учётной записью ведущего.'
             : 'Комната не создана. Проверьте доступность викторины.',
         );
     } catch {

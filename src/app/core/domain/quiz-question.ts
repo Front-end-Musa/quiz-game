@@ -21,4 +21,5 @@ export interface QuestionSolution {
   readonly questionId: string;
   readonly correctOptionId: string;
   readonly explanation: string;
+  readonly reference?: string;
 }

@@ -1,0 +1,22 @@
+:host { display: block; }
+.admin-shell, section.stack { padding-block: 2rem; }
+.admin-heading { display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; flex-wrap: wrap; }
+.admin-heading h1 { font-size: clamp(2rem, 5vw, 3.5rem); }
+.admin-nav, .admin-actions { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
+.admin-nav { margin-block: 2rem; padding-bottom: 1rem; border-bottom: 1px solid var(--line, #ddd); }
+.admin-nav a { padding: .45rem .8rem; border-radius: 2rem; text-decoration: none; }
+.admin-nav .selected { background: var(--ink); color: var(--paper); }
+.admin-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 1.25rem; }
+.admin-login { max-width: 640px; margin: 2rem auto; }
+label { display: grid; gap: .4rem; font-weight: 600; }
+input, textarea, select { width: 100%; padding: .8rem; border: 1px solid var(--line, #bbb); border-radius: .65rem; background: var(--paper); color: var(--ink); font: inherit; }
+textarea { min-height: 7rem; resize: vertical; }
+label.check { display: flex; align-items: flex-start; gap: .7rem; }
+.check input { width: auto; margin-top: .5rem; }
+fieldset { margin: 0; padding: 1.5rem; border: 1px solid var(--line, #ddd); border-radius: 1rem; min-width: 0; }
+legend { font-weight: 700; padding: .5rem; }
+.admin-toolbar { position: sticky; bottom: 1rem; padding: 1rem; background: var(--paper); border: 1px solid var(--line, #ddd); border-radius: 1rem; z-index: 2; }
+.admin-preview { border-left: 4px solid var(--ink); padding: 1rem; }
+.admin-preview li { margin-block: .4rem; }
+.admin-record { max-height: 30rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-size: .85rem; }
+[role=alert] { color: #9a2e1b; }

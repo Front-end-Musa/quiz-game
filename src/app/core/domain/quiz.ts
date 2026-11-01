@@ -11,4 +11,6 @@ export interface Quiz {
   readonly questionIds: readonly string[];
   readonly defaultTimeLimitSeconds: number;
   readonly status: ContentStatus;
+  readonly archived?: boolean;
+  readonly published?: boolean;
 }

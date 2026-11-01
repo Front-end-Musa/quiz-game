@@ -1,8 +1,42 @@
 # Multiplayer Quiz Platform — Approved Architecture
 
-Status: approved by the user on 2026-10-31. Phases 2–4 foundation, main UI and lobby implemented on 2026-10-31.
+**Owner administration (2026-11-01):** `/admin` now provides owner-only, lazy-loaded content editing/publishing, game defaults, room/result inspection and account access. Rules require the pinned verified owner UID and admin claim. Publishing creates immutable versions and validates completeness atomically through bounded marker documents; live games retain their versions. See [ADMIN_PANEL.md](ADMIN_PANEL.md). Live owner provisioning and Rules publication are complete; no password is embedded or provisioned by scripts.
 
-This document preserves the approved technical plan and product decisions. The Phase 2 implementation notes below supersede the original naming and route proposals; the remaining multiplayer/gameplay sections describe future work.
+**Current Firebase implementation (2026-11-01):** `provideFirebase()` now replaces mock providers in normal builds. Anonymous player identity, Google host login, protected content, Firestore rooms/admission, server-timestamped answers, host scoring/recovery and participant results are implemented. Rules and emulator coverage accompany the adapter. Rules and content have been published to `quiz-game-19c55`; a live SDK check verified anonymous sign-in, quiz reads and protected-data denials. See [FIREBASE_SETUP.md](FIREBASE_SETUP.md) for the implemented schema, setup and limits. Earlier audit/phase notes below are historical. Browser Google login, actual mobile gameplay and Hosting publication remain separate checks.
+
+Status: approved by the user on 2026-10-31. Phases 2–6 foundation, lobby, local gameplay and results implemented on 2026-10-31.
+
+This document preserves the approved technical plan and product decisions. The newest implementation notes take precedence; earlier phase notes and the original plan are retained as history. Current audit evidence is in FINAL_AUDIT.md; the unimplemented Spark proposal is in FIREBASE_PREPARATION.md.
+
+## Phase 7 audit notes (current behaviour)
+
+- Keep domain/ports/state/infrastructure and lazy features. No new state library, generic repository framework or Firebase implementation was added.
+- Optional `DEVELOPMENT_TOOLS` now isolates simulator/test controls from normal RoomGateway. Feature/shared/state source no longer imports mock infrastructure. Results obtain viewer information from RoomGateway rather than reading local credentials.
+- Host reveal and advance commands include an expected round/attempt ID. Old-tab commands cannot reveal or advance a newer attempt. Developer controls have the same attempt fence.
+- Existing credentialed active players may rejoin after start without changing name/roster; new identities remain denied. This is a mock functional policy, not Firebase security.
+- One domain nickname normalizer serves admission and generated-name collision checks. Historical result migrations belong only to the persistence adapter.
+- Timing intervals exist only during questions. Expiry is committed after delivering the countdown frame so synchronous local snapshots cannot overwrite a reveal with a stale question frame.
+- BroadcastChannel creation/post failures are isolated from successful IndexedDB initialization/commit. Real-browser storage and notification behaviour remains unverified in this environment.
+- Verified: strict TypeScript, production build without warnings, and 84 automated tests including a landing-to-winner/replay UI flow and a distinct-identity 15-player adapter flow. Actual browser/mobile/IndexedDB multi-tab checks are explicitly not reported as passed.
+- `FINAL_AUDIT.md` records coverage, fixes, structure, decisions, commands, known limits and results. `FIREBASE_PREPARATION.md` specifies the future Spark-only trusted-host schema, Rules policies, server-time deadlines, admission, idempotent host scoring and recovery plan. No server-side score verification is promised under the no-backend constraint.
+- User-provided Firebase setup notes are not live integration and remain unchanged. Firebase implementation/deployment requires later approval.
+
+## Phases 5–6 implementation notes (current behaviour)
+
+- Local playable lifecycle is `lobby → question → reveal → question → … → finished`. Timing belongs to `GameTimingService`, with an injectable clock and absolute deadlines; no component-owned intervals. Returning after a deadline reconciles the reveal.
+- The latest user defaults supersede the original plan: 100 points for a correct answer and at most 50 speed points, floor-proportional to clamped remaining time. Existing explicitly configured rooms retain their settings. Incorrect and unanswered questions earn zero.
+- Selecting an option submits immediately and locks selection. Transactions prevent duplicate scoring or changed answers; attempt IDs reject stale requests. Accepted command retries are idempotent. Solutions enter public snapshots only in reveal.
+- `ScoringService` is separate from the local adapter-side engine. Question explanations and optional references remain content, never Quran-specific engine logic. Missing demo references are disclosed rather than invented.
+- Host controls reveal and progression. Development-only controls reveal/advance/restart/finish. Restart replaces the attempt ID and removes that attempt's answer and awards before recalculation.
+- Development **Играть самому** creates a separate non-mock local player identity and labelled mock participants to meet the minimum, keeping the host out of standings. Retained host credentials authorize only the explicit development-controller commands; normal host APIs still reject that player's identity.
+- Per-question results show correct and submitted answers, correctness, earned points, explanation/reference and updated ranking.
+- A shared ResultsSummary presents the winner, a finite reduced-motion-aware celebration, readable rankings, personal result, and expandable player statistics on both game completion and the dedicated results route.
+- GameResult stores completed/planned question counts, replay settings and host nickname. Standings store answered count and mock status. Accuracy is correct answers / completed questions, rounded to a percentage; timeouts count in the denominator. Early developer finishes are labelled and use only completed rounds.
+- Ranking remains points, correct count, cumulative correct-response time, then original join order. Simulated participants are explicitly labelled, including if one wins an all-zero tie.
+- Replay creates a fresh room with the finished game's settings and an empty roster; the previous game and results remain unchanged. A new room is intentionally not a reset of the finished one.
+- Firebase integration is not implemented. The user's proposed Spark architecture requires Anonymous Authentication, Firestore/Hosting only, host-controlled scores/progression, protected solutions and no Functions/backend. That proposal remains pending approval; it does not describe the security of the local mock adapter.
+- Automated verification includes full Angular UI playthrough → final statistics → replay, both quiz topics, fake-clock expiry, duplicate prevention, late/stale answers, scoring, restart rollback and tie-breaks. Browser screenshots/actual IndexedDB multi-tab verification remain unavailable under sandbox restrictions.
+- Earlier phase notes below are historical where they conflict with this section.
 
 ## Phase 4 implementation notes (current behaviour)
 

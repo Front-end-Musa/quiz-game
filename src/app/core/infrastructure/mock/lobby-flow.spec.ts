@@ -76,7 +76,7 @@ it('supports a complete host create/add/remove/reset/start flow', async () => {
   const start = await host.gateway.start(room.code);
   expect(start.ok).toBe(true);
   if (!start.ok) throw new Error('Start rejected');
-  expect(start.value.phase).toBe('question_open');
+  expect(start.value.phase).toBe('question');
   expect(start.value.currentRound?.questionId).toBe('general-1');
   expect(start.value.currentRound!.deadline - start.value.currentRound!.openedAt).toBe(20000);
   expect(start.value.playerIds).not.toContain(start.value.hostId);
@@ -217,4 +217,101 @@ it('ignores malformed session data rather than assigning roles', () => {
   storage.setItem('quiz-session-v1', '{bad json');
   const viewer = client(new MemoryRoomStore(), storage);
   expect(viewer.session.changes.value).toEqual({});
+});
+
+it('audits a complete 15-player game with distinct host/player identities, rejoin, scoring and replay data', async () => {
+  const store = new MemoryRoomStore();
+  const host = client(store);
+  const player = client(store);
+  const created = await host.gateway.create(
+    'general-knowledge',
+    {
+      questionCount: 3,
+      timeLimitSeconds: 20,
+      pointsPerCorrectAnswer: 100,
+      speedBonusPoints: 50,
+      minPlayers: 8,
+      maxPlayers: 15,
+    },
+    'Хозяин вечера',
+  );
+  if (!created.ok) throw new Error(created.error);
+  const code = created.value.code;
+  const joined = await player.gateway.join(code, 'Настоящий игрок');
+  if (!joined.ok) throw new Error(joined.error);
+  for (let i = 0; i < 14; i++) expect((await host.simulator.add(code, `Макет ${i}`)).ok).toBe(true);
+  expect((await firstValueFrom(host.gateway.observe(code)))?.players).toHaveLength(15);
+  expect((await host.gateway.start(code)).ok).toBe(true);
+  // A previously admitted identity may rejoin; a new identity may not join mid-game.
+  expect(await player.gateway.join(code, 'Другое имя')).toEqual(joined);
+  expect(await client(store).gateway.join(code, 'Опоздавший')).toEqual({
+    ok: false,
+    error: 'game-started',
+  });
+  for (const option of ['3', '3', '2']) {
+    const before = (await firstValueFrom(player.gateway.observe(code)))!;
+    const id = before.room.currentRound!.id;
+    expect(before.viewerRole).toBe('player');
+    expect(before.reveal).toBeNull();
+    expect(JSON.stringify(before)).not.toContain('correctOptionId');
+    expect((await player.gateway.submitAnswer(code, id, option, crypto.randomUUID())).ok).toBe(
+      true,
+    );
+    expect((await host.gateway.revealAnswer(code, id)).ok).toBe(true);
+    expect(
+      (await firstValueFrom(player.gateway.observe(code)))?.reveal?.solution.correctOptionId,
+    ).toBe(option);
+    expect((await host.gateway.advanceQuestion(code, id)).ok).toBe(true);
+  }
+  const final = (await firstValueFrom(host.gateway.observe(code)))!;
+  expect(final.room.phase).toBe('finished');
+  expect(final.result?.standings).toHaveLength(15);
+  expect(final.result?.winnerId).toBe(joined.value.id);
+  expect(final.result?.standings[0].correctAnswers).toBe(3);
+  expect(final.result?.standings[0].totalPoints).toBeGreaterThanOrEqual(300);
+  expect(
+    final.result?.standings
+      .filter((entry) => entry.isMock)
+      .every((entry) => entry.totalPoints === 0),
+  ).toBe(true);
+  expect(final.result?.standings.some((entry) => entry.playerId === final.room.hostId)).toBe(false);
+  const replay = await host.gateway.create(
+    final.room.quizId,
+    final.result!.settings,
+    final.room.hostNickname,
+  );
+  expect(replay.ok).toBe(true);
+  if (replay.ok) {
+    expect(replay.value.code).not.toBe(code);
+    expect((await firstValueFrom(host.gateway.observe(replay.value.code)))?.players).toEqual([]);
+  }
+  expect((await firstValueFrom(host.gateway.observe(code)))?.result).toEqual(final.result);
+});
+
+it('rejects delayed host controls against a newer attempt and blocks all player progression', async () => {
+  const store = new MemoryRoomStore();
+  const host = client(store);
+  const player = client(store);
+  const room = await create(host.gateway);
+  await player.gateway.join(room.code, 'Игрок');
+  await host.simulator.add(room.code, 'Макет');
+  await host.gateway.start(room.code);
+  const oldId = (await firstValueFrom(host.gateway.observe(room.code)))!.room.currentRound!.id;
+  expect(await player.gateway.revealAnswer(room.code, oldId)).toEqual({
+    ok: false,
+    error: 'forbidden',
+  });
+  await host.gateway.revealAnswer(room.code, oldId);
+  await host.gateway.advanceQuestion(room.code, oldId);
+  expect(await host.gateway.revealAnswer(room.code, oldId)).toEqual({
+    ok: false,
+    error: 'stale-round',
+  });
+  expect(await host.gateway.advanceQuestion(room.code, oldId)).toEqual({
+    ok: false,
+    error: 'stale-round',
+  });
+  const next = (await firstValueFrom(host.gateway.observe(room.code)))!;
+  expect(next.room.currentRound?.index).toBe(1);
+  expect(next.room.phase).toBe('question');
 });

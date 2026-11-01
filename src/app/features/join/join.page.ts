@@ -5,8 +5,15 @@ import { ROOM_GATEWAY, RoomErrorCode } from '../../core/ports/room-gateway';
 import { Button } from '../../shared/ui/button';
 import { PageHeader } from '../../shared/ui/page-header';
 import { FormField } from '../../shared/ui/form-field';
+import { FirebaseConnection } from '../../core/infrastructure/firebase/firebase-connection';
 
 const messages: Record<RoomErrorCode, string> = {
+  'host-unavailable': 'Ведущий не ответил. Попросите его открыть комнату и попробуйте ещё раз.',
+  'invalid-phase': 'Сейчас нельзя выполнить это действие.',
+  'stale-round': 'Вопрос уже изменился.',
+  'already-answered': 'Ответ уже принят.',
+  'invalid-option': 'Такого варианта нет.',
+  'answer-too-late': 'Время вышло.',
   forbidden: 'Это действие доступно только ведущему.',
   'not-enough-players': 'Для старта пока недостаточно игроков.',
   'player-not-found': 'Этот игрок уже покинул комнату.',
@@ -15,7 +22,7 @@ const messages: Record<RoomErrorCode, string> = {
   'storage-unavailable':
     'Не удалось сохранить изменение. Проверьте доступность хранилища браузера.',
   'development-only': 'Симуляция доступна только в режиме разработки.',
-  'room-not-found': 'Комната не найдена. Проверьте код. Для демо: DEMO22.',
+  'room-not-found': 'Комната не найдена. Проверьте код.',
   'room-full': 'В комнате больше нет свободных мест. Попросите ведущего проверить лимит игроков.',
   'name-taken': 'Это имя уже занято. Добавьте фамилию или выберите другое.',
   'invalid-name': 'Введите имя от 1 до 24 символов.',
@@ -30,6 +37,7 @@ const messages: Record<RoomErrorCode, string> = {
   templateUrl: './join.page.html',
 })
 export class JoinPage {
+  readonly firebase = inject(FirebaseConnection, { optional: true });
   private readonly rooms = inject(ROOM_GATEWAY);
   readonly busy = signal(false);
   readonly error = signal('');

@@ -1,3 +1,4 @@
+import { DEVELOPMENT_TOOLS } from '../../core/ports/development-tools';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, withComponentInputBinding, Router, NavigationEnd } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
@@ -78,7 +79,7 @@ it('completes room creation, developer add/remove/reset, minimum settings, and h
   expect(harness.routeNativeElement?.textContent).toContain('Игра началась!');
   expect(harness.routeNativeElement?.textContent).toContain('Какая планета ближе всего к Солнцу?');
   const state = await firstValueFrom(TestBed.inject(ROOM_GATEWAY).observe(code));
-  expect(state?.room.phase).toBe('question_open');
+  expect(state?.room.phase).toBe('question');
 });
 
 it('shows player waiting information without management or simulation controls', async () => {
@@ -110,4 +111,14 @@ it('supports a clearly labelled player preview without losing host ownership', a
   expect(
     (await firstValueFrom(TestBed.inject(ROOM_GATEWAY).observe(created.value.code)))?.viewerRole,
   ).toBe('host');
+});
+
+it('renders normal host controls without a development-tools implementation', async () => {
+  TestBed.overrideProvider(DEVELOPMENT_TOOLS, { useValue: null });
+  const created = await TestBed.inject(ROOM_GATEWAY).create('general-knowledge');
+  if (!created.ok) throw new Error('No room');
+  const harness = await RouterTestingHarness.create(`/lobby/${created.value.code}`);
+  await settle(harness);
+  expect(harness.routeNativeElement?.querySelector('.dev-tools')).toBeNull();
+  expect(button(harness, 'Начать игру')).toBeDefined();
 });

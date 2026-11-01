@@ -1,0 +1,262 @@
+@if (game.state() === undefined) {
+  <app-loading-state label="Собираем игровой круг…" />
+} @else if (game.state(); as state) {
+  @if (state.connectionStatus === 'cached') {
+    <p role="status">Ожидаем соединения. Действия должны быть подтверждены сервером.</p>
+  }
+  @if (state.closing) {
+    <p role="status">Считаем очки…</p>
+  }
+  @if (state.room.phase === 'finished' && state.result; as result) {
+    <app-results-summary
+      [result]="result"
+      [viewerPlayerId]="state.viewerPlayerId"
+      [showDetailsLink]="true"
+      [busy]="replay.busy()"
+      [error]="replay.error()"
+      (playAgain)="replay.start(result)"
+    />
+  } @else if (state.room.phase === 'lobby') {
+    <app-empty-state
+      title="Здесь будет игра"
+      message="Пока собираемся в лобби. Ведущий запустит первый вопрос, когда компания будет готова."
+      [link]="'/lobby/' + state.room.code"
+      label="Вернуться в лобби"
+    />
+  } @else if (state.room.currentRound; as round) {
+    <section class="game-stage" [attr.data-phase]="state.room.phase">
+      <header class="game-topline">
+        <div>
+          <p class="eyebrow">Комната {{ state.room.code }}</p>
+          <span class="game-nickname">{{
+            game.player()?.displayName ??
+              (state.viewerRole === 'host' ? state.room.hostNickname + ' · ведущий' : 'Зритель')
+          }}</span>
+        </div>
+        <app-badge [tone]="state.room.phase === 'reveal' ? 'success' : 'pending'">{{
+          state.room.phase === 'reveal'
+            ? 'Разбор ответа'
+            : state.ownAnswer
+              ? 'Ответ принят'
+              : 'Игра началась! Выбираем ответ'
+        }}</app-badge>
+        <div class="score-counter">
+          <span>{{ state.viewerRole === 'player' ? 'Ваши очки' : 'Ведущий вне зачёта' }}</span
+          ><strong>{{ state.score }}</strong>
+        </div>
+      </header>
+      <div class="question-meta">
+        <span>Вопрос {{ round.index + 1 }} из {{ state.room.questionIds.length }}</span
+        ><span
+          class="countdown"
+          [class.urgent]="state.room.phase === 'question' && (game.frame()?.seconds ?? 0) <= 5"
+          role="timer"
+          aria-label="Осталось секунд"
+          >{{
+            state.room.phase === 'reveal' ? 'Разбор' : (game.frame()?.seconds ?? 0) + ' сек'
+          }}</span
+        >
+      </div>
+      <div
+        class="question-progress"
+        role="progressbar"
+        aria-label="Прогресс викторины"
+        [attr.aria-valuenow]="game.progress()"
+        aria-valuemin="0"
+        aria-valuemax="100"
+      >
+        <span [style.width.%]="game.progress()"></span>
+      </div>
+      @if (state.room.phase === 'question') {
+        <div class="time-track" aria-hidden="true">
+          <span [style.width.%]="game.frame()?.remainingPercent"></span>
+        </div>
+      }
+      @if (game.question.isLoading()) {
+        <app-loading-state label="Открываем вопрос…" />
+      } @else if (game.question.error()) {
+        <app-empty-state
+          title="Вопрос не загрузился"
+          message="Обновите страницу. Принятый ответ и время сохраняются в комнате."
+          [link]="'/lobby/' + state.room.code"
+          label="Проверить комнату"
+        />
+      } @else if (game.question.value(); as question) {
+        <h1 class="game-question" [attr.data-round]="round.id">{{ question.prompt }}</h1>
+        <div class="answer-grid" role="group" aria-label="Варианты ответа">
+          @for (option of question.options; track option.id; let index = $index) {
+            <button
+              class="answer-option"
+              type="button"
+              [disabled]="!game.canAnswer()"
+              [class.selected]="game.selected() === option.id"
+              [class.correct]="state.reveal?.solution?.correctOptionId === option.id"
+              [class.incorrect]="
+                state.room.phase === 'reveal' &&
+                game.selected() === option.id &&
+                state.reveal?.solution?.correctOptionId !== option.id
+              "
+              [attr.aria-pressed]="game.selected() === option.id"
+              (click)="game.answer(option.id)"
+            >
+              <span class="answer-letter" aria-hidden="true">{{ letters[index] }}</span
+              ><span>{{ option.text }}</span>
+              @if (state.reveal?.solution?.correctOptionId === option.id) {
+                <span class="answer-tag">✓ Верный ответ</span>
+              } @else if (game.selected() === option.id) {
+                <span class="answer-tag">{{
+                  state.room.phase === 'reveal' ? '✕ Ваш ответ' : '✓ Выбрано'
+                }}</span>
+              }
+            </button>
+          }
+        </div>
+        @if (state.reveal; as reveal) {
+          <section class="answer-reveal stack" aria-live="polite">
+            <p class="eyebrow">
+              {{
+                state.viewerRole === 'player'
+                  ? state.ownAnswer
+                    ? game.award()?.correct
+                      ? 'Верно! Отличная работа.'
+                      : 'В этот раз — другой ответ.'
+                    : 'Вы не успели ответить.'
+                  : 'Показываем правильный ответ'
+              }}
+            </p>
+            @if (state.viewerRole === 'player') {
+              <h2>+{{ game.award()?.points ?? 0 }} очков</h2>
+            }
+            <dl class="round-answer-summary">
+              <div>
+                <dt>Верный ответ</dt>
+                <dd>{{ game.correctAnswer() }}</dd>
+              </div>
+              @if (state.viewerRole === 'player') {
+                <div>
+                  <dt>Ваш ответ</dt>
+                  <dd>{{ game.yourAnswer() }}</dd>
+                </div>
+              }
+            </dl>
+            <p>{{ reveal.solution.explanation }}</p>
+            @if (reveal.solution.reference) {
+              <p class="reference">Источник: {{ reveal.solution.reference }}</p>
+            } @else {
+              <p class="reference">Источник не указан в демонаборе.</p>
+            }
+            <p class="muted">
+              {{
+                state.viewerRole === 'host'
+                  ? 'Готовы продолжить? Откройте следующий вопрос.'
+                  : 'Следующий вопрос откроет ведущий.'
+              }}
+            </p>
+          </section>
+          <section class="round-ranking">
+            <h2>Рейтинг после вопроса</h2>
+            <app-leaderboard-table
+              [entries]="state.standings"
+              [questionCount]="round.index + 1"
+              [highlightPlayerId]="state.viewerPlayerId"
+              caption="Текущий рейтинг игроков"
+            />
+          </section>
+        } @else {
+          <p class="submission-state" role="status">
+            {{
+              state.ownAnswer
+                ? 'Ответ принят. Держим интригу до разбора!'
+                : game.selected()
+                  ? 'Сохраняем ваш ответ…'
+                  : state.viewerRole === 'player'
+                    ? 'Нажмите на вариант — ответ сразу отправится. Изменить выбор нельзя.'
+                    : state.viewerRole === 'host'
+                      ? 'Ведущий управляет вопросом и не отвечает.'
+                      : 'Вы смотрите игру. Отвечать могут только участники комнаты.'
+            }}
+          </p>
+        }
+      } @else {
+        <p role="alert">Вопрос отсутствует в наборе.</p>
+      }
+      @if (state.viewerRole === 'host') {
+        <div class="host-game-actions">
+          @if (state.room.phase === 'question') {
+            <button
+              appButton
+              variant="secondary"
+              type="button"
+              [disabled]="game.busy()"
+              (click)="game.reveal()"
+            >
+              Показать ответ
+            </button>
+          } @else {
+            <button appButton type="button" [disabled]="game.busy()" (click)="game.advance()">
+              {{
+                round.index + 1 === state.room.questionIds.length
+                  ? 'Завершить игру'
+                  : 'Следующий вопрос'
+              }}
+              →
+            </button>
+          }
+        </div>
+      }
+      @if (state.canUseDevControls) {
+        <aside class="dev-tools">
+          <p class="eyebrow">DEV · управление тестом</p>
+          <p>
+            Эти действия доступны только для локального тестирования. Перезапуск отменит ответ и
+            очки за текущий вопрос.
+          </p>
+          <div class="actions">
+            <button
+              class="text-button"
+              type="button"
+              [disabled]="game.busy() || state.room.phase !== 'question'"
+              (click)="game.development('reveal')"
+            >
+              Раскрыть ответ · DEV</button
+            ><button
+              class="text-button"
+              type="button"
+              [disabled]="game.busy() || state.room.phase !== 'reveal'"
+              (click)="game.development('advance')"
+            >
+              Следующий вопрос · DEV</button
+            ><button
+              class="text-button"
+              type="button"
+              [disabled]="game.busy()"
+              (click)="game.development('restart')"
+            >
+              Перезапустить вопрос · DEV</button
+            ><button
+              class="text-button"
+              type="button"
+              [disabled]="game.busy()"
+              (click)="game.development('finish')"
+            >
+              Завершить игру · DEV
+            </button>
+          </div>
+        </aside>
+      }
+      @if (game.error()) {
+        <p role="alert">{{ game.error() }}</p>
+      }
+      @if (game.frame()?.error) {
+        <p role="alert">{{ game.frame()?.error }}</p>
+      }
+    </section>
+  }
+} @else {
+  <app-empty-state
+    title="Комната не найдена"
+    message="Проверьте код или создайте новую комнату."
+    link="/quizzes"
+    label="Выбрать викторину"
+  />
+}

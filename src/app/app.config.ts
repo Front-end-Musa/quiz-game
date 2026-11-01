@@ -1,7 +1,7 @@
 import { ApplicationConfig, provideBrowserGlobalErrorListeners } from '@angular/core';
 import { provideRouter, withComponentInputBinding, withInMemoryScrolling } from '@angular/router';
 import { routes } from './app.routes';
-import { provideMocks } from './core/infrastructure/mock/provide-mocks';
+import { provideFirebase } from './core/infrastructure/firebase/provide-firebase';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -11,6 +11,6 @@ export const appConfig: ApplicationConfig = {
       withComponentInputBinding(),
       withInMemoryScrolling({ scrollPositionRestoration: 'enabled' }),
     ),
-    ...provideMocks(),
+    ...provideFirebase(),
   ],
 };

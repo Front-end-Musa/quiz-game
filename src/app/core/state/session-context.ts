@@ -39,7 +39,7 @@ export class SessionContext {
     }
   }
   readonly changes = new BehaviorSubject<Record<string, RoomCredential>>(this.read());
-  get(roomId: string) {
+  get(roomId: string): RoomCredential | undefined {
     return this.changes.value[roomId];
   }
   set(roomId: string, credential: RoomCredential) {

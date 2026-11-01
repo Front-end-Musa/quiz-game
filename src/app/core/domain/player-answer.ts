@@ -5,6 +5,7 @@ export interface PlayerAnswer {
   readonly playerId: string;
   readonly questionId: string;
   readonly roundIndex: number;
+  readonly roundId: string;
   readonly optionId: string;
   readonly acceptedAt: number;
 }

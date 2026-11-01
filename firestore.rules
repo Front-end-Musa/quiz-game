@@ -1,0 +1,393 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function isOwnerAdmin() {
+      let owner = get(/databases/$(database)/documents/adminConfiguration/owner).data;
+      return signedIn() && request.auth.token.get('admin', false) == true &&
+        request.auth.uid == owner.uid && owner.enabled == true &&
+        owner.email == 'rufatulymusa567@gmail.com' &&
+        request.auth.token.get('email', '') == owner.email && request.auth.token.get('email_verified', false) == true;
+    }
+    function recentOwner() {
+      return isOwnerAdmin() && request.time < timestamp.value(request.auth.token.auth_time * 1000) + duration.value(15, 'm');
+    }
+    function enabledHost() {
+      return signedIn() && (
+        (exists(/databases/$(database)/documents/hostAccess/$(request.auth.uid)) &&
+          get(/databases/$(database)/documents/hostAccess/$(request.auth.uid)).data.enabled == true) ||
+        (request.auth.token.get('email_verified', false) == true &&
+          exists(/databases/$(database)/documents/hostEmails/$(request.auth.token.email)) &&
+          get(/databases/$(database)/documents/hostEmails/$(request.auth.token.email)).data.enabled == true)
+      );
+    }
+    function room(code) { return get(/databases/$(database)/documents/rooms/$(code)).data; }
+    function host(code) { return signedIn() && room(code).hostId == request.auth.uid; }
+    function member(code) {
+      return signedIn() && (room(code).hostId == request.auth.uid || request.auth.uid in room(code).playerIds);
+    }
+    function settings(s) {
+      return s.keys().hasAll(['questionCount', 'timeLimitSeconds', 'pointsPerCorrectAnswer', 'speedBonusPoints', 'minPlayers', 'maxPlayers']) &&
+        s.keys().hasOnly(['questionCount', 'timeLimitSeconds', 'pointsPerCorrectAnswer', 'speedBonusPoints', 'minPlayers', 'maxPlayers', 'prizeDescription']) &&
+        s.questionCount is int && s.questionCount >= 1 && s.questionCount <= 100 &&
+        s.timeLimitSeconds is int && s.timeLimitSeconds >= 5 && s.timeLimitSeconds <= 120 &&
+        s.pointsPerCorrectAnswer is int && s.pointsPerCorrectAnswer >= 1 && s.pointsPerCorrectAnswer <= 5000 &&
+        s.speedBonusPoints is int && s.speedBonusPoints >= 0 && s.speedBonusPoints <= s.pointsPerCorrectAnswer &&
+        s.minPlayers is int && s.minPlayers >= 2 && s.minPlayers <= s.maxPlayers &&
+        s.maxPlayers is int && s.maxPlayers >= 2 && s.maxPlayers <= 15;
+    }
+    function shape(r, code) {
+      return r.keys().hasOnly(['id', 'code', 'quizId', 'quizVersion', 'questionIds', 'hasCustomQuestions', 'contentRevision', 'hostId', 'hostNickname', 'nextJoinOrder', 'phase', 'playerIds', 'settings', 'createdAt', 'revision', 'currentRound', 'players', 'standings', 'reveal', 'result', 'closing']) &&
+        r.id == code && r.code == code && code.matches('^[A-Z0-9]{6}$') &&
+        r.hostNickname is string && r.hostNickname.size() > 0 && r.hostNickname.size() <= 24 &&
+        r.playerIds is list && r.players is list && r.playerIds.size() == r.players.size() &&
+        r.playerIds.toSet().size() == r.playerIds.size() &&
+        !(r.hostId in r.playerIds) && r.playerIds.size() <= r.settings.maxPlayers &&
+        r.questionIds is list && r.questionIds.size() == r.settings.questionCount && r.questionIds.size() <= 15 &&
+        r.questionIds.toSet().size() == r.questionIds.size() &&
+        r.get('hasCustomQuestions', false) is bool && r.get('contentRevision', 0) is int &&
+        (r.get('hasCustomQuestions', false) ? r.contentRevision >= 1 : r.get('contentRevision', 0) == 0) &&
+        r.standings is list && r.standings.size() <= 15 &&
+        r.nextJoinOrder is int && r.nextJoinOrder > 0 && r.closing is bool && settings(r.settings);
+    }
+    function quizFields(q, id) {
+      return q.id == id && id.matches('^[A-Za-z0-9_-]{1,100}$') &&
+        q.version is int && q.version >= 1 &&
+        q.title is string && q.title.size() > 0 && q.title.size() <= 120 &&
+        q.description is string && q.description.size() <= 2000 &&
+        q.topic is string && q.topic.size() > 0 && q.topic.size() <= 80 &&
+        q.difficulty in ['beginner', 'intermediate', 'advanced'] && q.status == 'approved' &&
+        q.defaultTimeLimitSeconds is int && q.defaultTimeLimitSeconds >= 5 && q.defaultTimeLimitSeconds <= 120 &&
+        q.questionIds is list && q.questionIds.size() >= 1 && q.questionIds.size() <= 15 &&
+        q.questionIds.toSet().size() == q.questionIds.size();
+    }
+    function questionPresent(id, version, ids, position) {
+      return ids.size() <= position ||
+        getAfter(/databases/$(database)/documents/quizzes/$(id)/versions/$(version)/questions/$(ids[position])).data.id == ids[position];
+    }
+    function completeVersion(id, version, q) {
+      return getAfter(/databases/$(database)/documents/quizzes/$(id)/versions/$(version)/checks/first).data.valid == true &&
+        getAfter(/databases/$(database)/documents/quizzes/$(id)/versions/$(version)/checks/second).data.valid == true &&
+        getAfter(/databases/$(database)/documents/quizSolutions/$(id + '_v' + version)).data.solutions.size() == q.questionIds.size();
+    }
+    function firstQuestions(id, version, q) {
+      return questionPresent(id, version, q.questionIds, 0) && questionPresent(id, version, q.questionIds, 1) &&
+        questionPresent(id, version, q.questionIds, 2) && questionPresent(id, version, q.questionIds, 3) &&
+        questionPresent(id, version, q.questionIds, 4) && questionPresent(id, version, q.questionIds, 5) &&
+        questionPresent(id, version, q.questionIds, 6) && questionPresent(id, version, q.questionIds, 7);
+    }
+    function secondQuestions(id, version, q) {
+      return questionPresent(id, version, q.questionIds, 8) && questionPresent(id, version, q.questionIds, 9) &&
+        questionPresent(id, version, q.questionIds, 10) && questionPresent(id, version, q.questionIds, 11) &&
+        questionPresent(id, version, q.questionIds, 12) && questionPresent(id, version, q.questionIds, 13) &&
+        questionPresent(id, version, q.questionIds, 14);
+    }
+    function summaryMatchesVersion(id, q) {
+      let v = getAfter(/databases/$(database)/documents/quizzes/$(id)/versions/$(string(q.version))).data;
+      return q.keys().hasOnly(['id', 'version', 'title', 'description', 'topic', 'difficulty', 'questionIds', 'defaultTimeLimitSeconds', 'status', 'published', 'archived', 'updatedAt', 'updatedBy']) &&
+        quizFields(q, id) && q.published == true && q.archived == false &&
+        q.updatedAt == request.time && q.updatedBy == request.auth.uid &&
+        q.id == v.id && q.version == v.version && q.title == v.title && q.description == v.description &&
+        q.topic == v.topic && q.difficulty == v.difficulty && q.questionIds == v.questionIds &&
+        q.defaultTimeLimitSeconds == v.defaultTimeLimitSeconds && q.status == v.status;
+    }
+    function option(o, id) {
+      return o.keys().hasOnly(['id', 'text']) && o.id == id && o.text is string && o.text.size() > 0 && o.text.size() <= 500;
+    }
+    function contentWritable(code) {
+      let r = getAfter(/databases/$(database)/documents/rooms/$(code)).data;
+      return signedIn() && r.hostId == request.auth.uid && r.phase == 'lobby' && r.hasCustomQuestions == true &&
+        (!exists(/databases/$(database)/documents/rooms/$(code)) ? r.contentRevision == 1 :
+          (room(code).phase == 'lobby' && r.contentRevision == room(code).get('contentRevision', 0) + 1));
+    }
+    function completeRoomContent(code, r) {
+      let questions = getAfter(/databases/$(database)/documents/rooms/$(code)/content/questions).data;
+      let keys = getAfter(/databases/$(database)/documents/rooms/$(code)/private/solutions).data;
+      return questions.revision == r.contentRevision && keys.revision == r.contentRevision && keys.reviewed == true &&
+        questions.questions.size() == r.questionIds.size() && keys.solutions.size() == r.questionIds.size() &&
+        getAfter(/databases/$(database)/documents/rooms/$(code)/contentChecks/ready).data.revision == r.contentRevision;
+    }
+    function roomContentReady(code, revision) {
+      return getAfter(/databases/$(database)/documents/rooms/$(code)/contentChecks/first).data.revision == revision &&
+        getAfter(/databases/$(database)/documents/rooms/$(code)/contentChecks/second).data.revision == revision &&
+        getAfter(/databases/$(database)/documents/rooms/$(code)/contentChecks/third).data.revision == revision &&
+        getAfter(/databases/$(database)/documents/rooms/$(code)/contentChecks/fourth).data.revision == revision &&
+        getAfter(/databases/$(database)/documents/rooms/$(code)/contentChecks/fifth).data.revision == revision &&
+        getAfter(/databases/$(database)/documents/rooms/$(code)/contentChecks/sixth).data.revision == revision &&
+        getAfter(/databases/$(database)/documents/rooms/$(code)/contentChecks/seventh).data.revision == revision &&
+        getAfter(/databases/$(database)/documents/rooms/$(code)/contentChecks/eighth).data.revision == revision;
+    }
+    function roomContentBlock(code, start) {
+      let r = getAfter(/databases/$(database)/documents/rooms/$(code)).data;
+      let questions = getAfter(/databases/$(database)/documents/rooms/$(code)/content/questions).data.questions;
+      let keys = getAfter(/databases/$(database)/documents/rooms/$(code)/private/solutions).data.solutions;
+      return roomQuestionValid(r, questions, keys, start) && roomQuestionValid(r, questions, keys, start + 1);
+    }
+    function roomQuestionValid(r, questions, keys, position) {
+      return r.questionIds.size() <= position || roomQuestionFields(r, questions[position], keys[position], position);
+    }
+    function roomQuestionFields(r, q, solution, position) {
+      return q.keys().hasOnly(['id', 'quizId', 'prompt', 'options', 'timeLimitSeconds', 'status', 'metadata']) &&
+        q.id == r.questionIds[position] && q.id.matches('^[A-Za-z0-9_-]{1,100}$') && q.quizId == r.quizId &&
+        q.status == 'approved' && q.prompt is string && q.prompt.size() > 0 && q.prompt.size() <= 2000 &&
+        q.timeLimitSeconds is int && q.timeLimitSeconds >= 5 && q.timeLimitSeconds <= 120 &&
+        q.options is list && q.options.size() == 4 && option(q.options[0], '1') && option(q.options[1], '2') &&
+        option(q.options[2], '3') && option(q.options[3], '4') &&
+        q.metadata == {'position': position} &&
+        solution.keys().hasOnly(['questionId', 'correctOptionId', 'explanation', 'reference']) &&
+        solution.questionId == q.id && solution.correctOptionId in ['1', '2', '3', '4'] &&
+        solution.explanation is string && solution.explanation.size() > 0 && solution.explanation.size() <= 4000 &&
+        solution.reference is string && solution.reference.size() <= 1000;
+    }
+    function publicQuestion(id, version, questionId) {
+      let q = request.resource.data;
+      let v = getAfter(/databases/$(database)/documents/quizzes/$(id)/versions/$(version)).data;
+      let keys = getAfter(/databases/$(database)/documents/quizSolutions/$(id + '_v' + version)).data.solutions;
+      let position = q.metadata.position;
+      let solution = keys[position];
+      return q.keys().hasOnly(['id', 'quizId', 'prompt', 'options', 'timeLimitSeconds', 'status', 'metadata']) &&
+        q.id == questionId && q.quizId == id && q.prompt is string && q.prompt.size() > 0 && q.prompt.size() <= 2000 &&
+        v.get('reviewed', false) == true && q.status == 'approved' && q.timeLimitSeconds == v.defaultTimeLimitSeconds &&
+        q.options is list && q.options.size() == 4 &&
+        option(q.options[0], '1') && option(q.options[1], '2') && option(q.options[2], '3') && option(q.options[3], '4') &&
+        q.metadata.keys().hasOnly(['position']) && position is int && position >= 0 && position < v.questionIds.size() &&
+        v.questionIds[position] == questionId &&
+        solution.keys().hasOnly(['questionId', 'correctOptionId', 'explanation', 'reference']) &&
+        solution.questionId == questionId && solution.correctOptionId in ['1', '2', '3', '4'] &&
+        solution.explanation is string && solution.explanation.size() > 0 && solution.explanation.size() <= 4000 &&
+        solution.reference is string && solution.reference.size() <= 1000;
+    }
+    match /adminConfiguration/owner {
+      allow get: if isOwnerAdmin();
+      allow list, write: if false;
+    }
+    match /adminDrafts/{id} {
+      allow get: if isOwnerAdmin();
+      allow list: if isOwnerAdmin() && request.query.limit <= 20;
+      allow create, update: if isOwnerAdmin() &&
+        request.resource.data.keys().hasOnly(['id', 'quiz', 'questions', 'solutions', 'reviewed', 'baseVersion', 'revision', 'updatedAt', 'updatedBy']) &&
+        request.resource.data.id == id && request.resource.data.quiz is map &&
+        request.resource.data.questions is list && request.resource.data.questions.size() <= 15 &&
+        request.resource.data.solutions is list && request.resource.data.solutions.size() <= 15 &&
+        request.resource.data.reviewed is bool && request.resource.data.baseVersion is int && request.resource.data.baseVersion >= 0 &&
+        request.resource.data.revision is int && request.resource.data.updatedAt == request.time &&
+        request.resource.data.updatedBy == request.auth.uid &&
+        (resource == null ? request.resource.data.revision == 0 : request.resource.data.revision == resource.data.revision + 1);
+      allow delete: if false;
+    }
+    match /appSettings/gameDefaults {
+      allow get: if signedIn();
+      allow list, delete: if false;
+      allow create, update: if recentOwner() && request.resource.data.keys().hasOnly(['questionCount', 'timeLimitSeconds', 'pointsPerCorrectAnswer', 'speedBonusPoints', 'minPlayers', 'maxPlayers', 'updatedAt', 'updatedBy']) &&
+        settings({'questionCount': request.resource.data.questionCount, 'timeLimitSeconds': request.resource.data.timeLimitSeconds,
+          'pointsPerCorrectAnswer': request.resource.data.pointsPerCorrectAnswer, 'speedBonusPoints': request.resource.data.speedBonusPoints,
+          'minPlayers': request.resource.data.minPlayers, 'maxPlayers': request.resource.data.maxPlayers}) &&
+        request.resource.data.questionCount <= 15 && request.resource.data.updatedAt == request.time && request.resource.data.updatedBy == request.auth.uid;
+    }
+    match /hostAccess/{uid} {
+      allow get: if signedIn() && request.auth.uid == uid;
+      allow list, write: if false;
+    }
+    match /hostEmails/{email} { allow read, write: if false; }
+    match /quizzes/{quizId} {
+      allow get: if isOwnerAdmin() || (signedIn() && (resource == null || resource.data.published == true && resource.data.archived == false));
+      allow list: if (isOwnerAdmin() && request.query.limit <= 20) ||
+        (signedIn() && resource.data.published == true && resource.data.archived == false);
+      allow create: if recentOwner() && request.resource.data.version == 1 && summaryMatchesVersion(quizId, request.resource.data);
+      allow update: if recentOwner() && (
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['archived', 'updatedAt', 'updatedBy']) &&
+          request.resource.data.archived is bool && request.resource.data.updatedAt == request.time && request.resource.data.updatedBy == request.auth.uid) ||
+        (request.resource.data.version == resource.data.version + 1 && summaryMatchesVersion(quizId, request.resource.data)));
+      allow delete: if false;
+      match /versions/{version} {
+        allow read: if signedIn();
+        allow create: if recentOwner() && request.resource.data.keys().hasOnly(['id', 'version', 'title', 'description', 'topic', 'difficulty', 'questionIds', 'defaultTimeLimitSeconds', 'status', 'reviewed']) &&
+          request.resource.data.reviewed == true && quizFields(request.resource.data, quizId) && string(request.resource.data.version) == version &&
+          completeVersion(quizId, version, request.resource.data);
+        allow update, delete: if false;
+        match /questions/{questionId} {
+          allow read: if signedIn();
+          allow create: if recentOwner() && publicQuestion(quizId, version, questionId);
+          allow update, delete: if false;
+        }
+        match /checks/{part} {
+          allow read: if isOwnerAdmin();
+          allow create: if recentOwner() && request.resource.data == {'valid': true} &&
+            getAfter(/databases/$(database)/documents/quizzes/$(quizId)/versions/$(version)).data.reviewed == true &&
+            ((part == 'first' && firstQuestions(quizId, version, getAfter(/databases/$(database)/documents/quizzes/$(quizId)/versions/$(version)).data)) ||
+             (part == 'second' && secondQuestions(quizId, version, getAfter(/databases/$(database)/documents/quizzes/$(quizId)/versions/$(version)).data)));
+          allow update, delete: if false;
+        }
+      }
+    }
+    match /quizSolutions/{versionKey} {
+      allow get: if enabledHost() || isOwnerAdmin();
+      allow list, update, delete: if false;
+      allow create: if recentOwner() && request.resource.data.keys().hasOnly(['quizId', 'version', 'solutions']) &&
+        versionKey == request.resource.data.quizId + '_v' + string(request.resource.data.version) &&
+        getAfter(/databases/$(database)/documents/quizzes/$(request.resource.data.quizId)/versions/$(string(request.resource.data.version))).data.get('reviewed', false) == true &&
+        request.resource.data.solutions is list && request.resource.data.solutions.size() ==
+          getAfter(/databases/$(database)/documents/quizzes/$(request.resource.data.quizId)/versions/$(string(request.resource.data.version))).data.questionIds.size();
+    }
+    match /roomCodes/{code} {
+      allow get: if signedIn();
+      allow list, update, delete: if false;
+      allow create: if enabledHost() && request.resource.data.keys().hasOnly(['code', 'roomId', 'title']) &&
+        request.resource.data.code == code && request.resource.data.roomId == code &&
+        request.resource.data.title is string &&
+        getAfter(/databases/$(database)/documents/rooms/$(code)).data.hostId == request.auth.uid;
+    }
+    match /rooms/{code} {
+      allow get: if isOwnerAdmin() || signedIn() && (resource == null || resource.data.hostId == request.auth.uid || request.auth.uid in resource.data.playerIds);
+      allow list: if isOwnerAdmin() && request.query.limit <= 20;
+      allow delete: if false;
+      allow create: if enabledHost() && shape(request.resource.data, code) &&
+        request.resource.data.hostId == request.auth.uid && request.resource.data.createdAt == request.time &&
+        request.resource.data.phase == 'lobby' && request.resource.data.playerIds.size() == 0 &&
+        request.resource.data.nextJoinOrder == 1 && request.resource.data.revision == 0 &&
+        request.resource.data.currentRound == null && request.resource.data.reveal == null &&
+        request.resource.data.result == null && request.resource.data.standings.size() == 0 && !request.resource.data.closing &&
+        get(/databases/$(database)/documents/quizzes/$(request.resource.data.quizId)).data.get('archived', false) == false &&
+        request.resource.data.quizVersion == get(/databases/$(database)/documents/quizzes/$(request.resource.data.quizId)).data.version &&
+        (request.resource.data.get('hasCustomQuestions', false) ? completeRoomContent(code, request.resource.data) :
+          (get(/databases/$(database)/documents/quizzes/$(request.resource.data.quizId)).data.status != 'placeholder' &&
+           request.resource.data.questionIds.hasOnly(get(/databases/$(database)/documents/quizzes/$(request.resource.data.quizId)).data.questionIds))) &&
+        getAfter(/databases/$(database)/documents/roomCodes/$(code)).data.roomId == code;
+      function opening() {
+        let r = request.resource.data;
+        let attempt = getAfter(/databases/$(database)/documents/rooms/$(code)/rounds/$(r.currentRound.id)).data;
+        return r.phase == 'question' && !r.closing && r.reveal == null &&
+          r.currentRound.keys().hasOnly(['id', 'questionId', 'index', 'openedAt']) &&
+          r.currentRound.openedAt == request.time && attempt.startedAt == request.time &&
+          attempt.questionId == r.questionIds[r.currentRound.index] &&
+          attempt.questionId == r.currentRound.questionId && attempt.index == r.currentRound.index &&
+          !attempt.closed && !attempt.scored &&
+          ((resource.data.phase == 'lobby' && r.currentRound.index == 0 && r.players.size() >= r.settings.minPlayers) ||
+           (resource.data.phase == 'reveal' && r.currentRound.index == resource.data.currentRound.index + 1));
+      }
+      function transition() {
+        let r = request.resource.data;
+        let old = resource.data;
+        return (old.phase == 'lobby' && r.phase == 'lobby' &&
+            r.diff(old).affectedKeys().hasOnly(['players', 'playerIds', 'nextJoinOrder', 'settings', 'revision']) &&
+            r.settings.diff(old.settings).affectedKeys().hasOnly(['minPlayers'])) ||
+          (old.phase == 'lobby' && r.phase == 'lobby' && r.get('hasCustomQuestions', false) == true &&
+            r.contentRevision == old.get('contentRevision', 0) + 1 &&
+            r.diff(old).affectedKeys().hasOnly(['questionIds', 'hasCustomQuestions', 'contentRevision', 'settings', 'revision']) &&
+            r.settings.diff(old.settings).affectedKeys().hasOnly(['questionCount']) && completeRoomContent(code, r)) ||
+          (opening() && r.diff(old).affectedKeys().hasOnly(['phase', 'currentRound', 'reveal', 'closing', 'revision'])) ||
+          (old.phase == 'question' && r.phase == 'question' && !old.closing && r.closing &&
+            r.diff(old).affectedKeys().hasOnly(['closing', 'revision']) &&
+            getAfter(/databases/$(database)/documents/rooms/$(code)/rounds/$(old.currentRound.id)).data.closed) ||
+          (old.phase == 'question' && old.closing && r.phase == 'reveal' && !r.closing &&
+            r.diff(old).affectedKeys().hasOnly(['phase', 'closing', 'standings', 'reveal', 'revision']) &&
+            r.reveal.roundId == old.currentRound.id &&
+            getAfter(/databases/$(database)/documents/rooms/$(code)/rounds/$(old.currentRound.id)).data.scored) ||
+          (old.phase == 'reveal' && r.phase == 'finished' && old.currentRound.index == old.questionIds.size() - 1 &&
+            r.diff(old).affectedKeys().hasOnly(['phase', 'result', 'revision']) &&
+            r.result.roomId == code && r.result.quizVersion == old.quizVersion);
+      }
+      allow update: if host(code) && shape(request.resource.data, code) &&
+        request.resource.data.revision == resource.data.revision + 1 && transition();
+      allow update: if recentOwner() && resource.data.phase == 'finished' &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['archived', 'archivedAt', 'archivedBy']) &&
+        request.resource.data.archived == true && request.resource.data.archivedAt == request.time && request.resource.data.archivedBy == request.auth.uid;
+
+      match /content/questions {
+        allow get: if member(code);
+        allow list, delete: if false;
+        allow create, update: if contentWritable(code) &&
+          request.resource.data.keys().hasOnly(['revision', 'questions']) &&
+          request.resource.data.revision == getAfter(/databases/$(database)/documents/rooms/$(code)).data.contentRevision &&
+          request.resource.data.questions is list && request.resource.data.questions.size() ==
+            getAfter(/databases/$(database)/documents/rooms/$(code)).data.questionIds.size();
+      }
+      match /private/solutions {
+        allow get: if host(code);
+        allow list, delete: if false;
+        allow create, update: if contentWritable(code) && request.resource.data.keys().hasOnly(['reviewed', 'revision', 'solutions']) &&
+          request.resource.data.reviewed == true && request.resource.data.solutions is list &&
+          request.resource.data.revision == getAfter(/databases/$(database)/documents/rooms/$(code)).data.contentRevision &&
+          request.resource.data.solutions.size() == getAfter(/databases/$(database)/documents/rooms/$(code)).data.questionIds.size();
+      }
+      match /contentChecks/{part} {
+        allow get: if host(code);
+        allow list, delete: if false;
+        allow create, update: if contentWritable(code) && request.resource.data.keys().hasOnly(['revision']) &&
+          request.resource.data.revision == getAfter(/databases/$(database)/documents/rooms/$(code)).data.contentRevision &&
+          ((part == 'first' && roomContentBlock(code, 0)) || (part == 'second' && roomContentBlock(code, 2)) ||
+           (part == 'third' && roomContentBlock(code, 4)) || (part == 'fourth' && roomContentBlock(code, 6)) ||
+           (part == 'fifth' && roomContentBlock(code, 8)) || (part == 'sixth' && roomContentBlock(code, 10)) ||
+           (part == 'seventh' && roomContentBlock(code, 12)) || (part == 'eighth' && roomContentBlock(code, 14)) ||
+           (part == 'ready' && roomContentReady(code, request.resource.data.revision)));
+      }
+
+      match /joinRequests/{uid} {
+        allow get: if signedIn() && (request.auth.uid == uid || host(code));
+        allow list: if host(code);
+        function ownPending() {
+          return signedIn() && request.auth.uid == uid && request.auth.uid != room(code).hostId &&
+            request.resource.data.keys().hasOnly(['displayName', 'status', 'requestedAt']) &&
+            request.resource.data.displayName is string && request.resource.data.displayName.size() > 0 &&
+            request.resource.data.displayName.size() <= 24 && request.resource.data.status == 'pending' &&
+            request.resource.data.requestedAt == request.time;
+        }
+        allow create: if ownPending();
+        allow update: if ownPending() || (host(code) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'error', 'player']) &&
+          resource.data.status == 'pending' &&
+          (request.resource.data.status == 'rejected' ||
+           (request.resource.data.status == 'accepted' && request.resource.data.player.id == uid &&
+            uid in getAfter(/databases/$(database)/documents/rooms/$(code)).data.playerIds)));
+        allow delete: if false;
+      }
+      match /rounds/{roundId} {
+        allow get: if member(code);
+        allow list, delete: if false;
+        allow create: if host(code) && request.resource.data.keys().hasOnly(['id', 'questionId', 'index', 'startedAt', 'durationSeconds', 'optionIds', 'closed', 'scored']) &&
+          request.resource.data.id == roundId && request.resource.data.startedAt == request.time &&
+          request.resource.data.durationSeconds == room(code).settings.timeLimitSeconds &&
+          request.resource.data.optionIds is list && request.resource.data.optionIds.size() == 4 &&
+          !request.resource.data.closed && !request.resource.data.scored &&
+          getAfter(/databases/$(database)/documents/rooms/$(code)).data.currentRound.id == roundId;
+        allow update: if host(code) && (
+          (!resource.data.closed && !resource.data.scored && request.resource.data.closed &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['closed']) &&
+            getAfter(/databases/$(database)/documents/rooms/$(code)).data.closing) ||
+          (resource.data.closed && !resource.data.scored && request.resource.data.scored &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['scored']) &&
+            getAfter(/databases/$(database)/documents/rooms/$(code)).data.phase == 'reveal'));
+        match /answers/{uid} {
+          allow get: if member(code) && (request.auth.uid == uid || host(code));
+          allow list: if host(code);
+          allow update, delete: if false;
+          allow create: if signedIn() && request.auth.uid == uid && uid in room(code).playerIds &&
+            room(code).phase == 'question' && !room(code).closing && room(code).currentRound.id == roundId &&
+            request.resource.data.keys().hasOnly(['id', 'commandId', 'roomId', 'playerId', 'questionId', 'roundIndex', 'roundId', 'optionId', 'acceptedAt']) &&
+            request.resource.data.playerId == uid && request.resource.data.roomId == code &&
+            request.resource.data.roundId == roundId && request.resource.data.questionId == room(code).currentRound.questionId &&
+            request.resource.data.roundIndex == room(code).currentRound.index &&
+            request.resource.data.commandId is string && request.resource.data.commandId.size() > 0 && request.resource.data.commandId.size() <= 128 &&
+            request.resource.data.id == request.resource.data.commandId &&
+            request.resource.data.acceptedAt == request.time &&
+            validAnswer(code, roundId, request.resource.data.optionId);
+        }
+      }
+    }
+    function validAnswer(code, roundId, optionId) {
+      let attempt = get(/databases/$(database)/documents/rooms/$(code)/rounds/$(roundId)).data;
+      return !attempt.closed && optionId in attempt.optionIds &&
+        request.time < attempt.startedAt + duration.value(attempt.durationSeconds, 's');
+    }
+    match /results/{code} {
+      allow get: if member(code) || isOwnerAdmin();
+      allow list: if (signedIn() && request.auth.uid in resource.data.memberIds) || (isOwnerAdmin() && request.query.limit <= 20);
+      allow create: if host(code) && request.resource.data.keys().hasOnly(['hostId', 'memberIds', 'result']) &&
+        request.resource.data.hostId == request.auth.uid &&
+        request.resource.data.memberIds.toSet() == room(code).playerIds.concat([request.auth.uid]).toSet() &&
+        getAfter(/databases/$(database)/documents/rooms/$(code)).data.phase == 'finished' &&
+        request.resource.data.result == getAfter(/databases/$(database)/documents/rooms/$(code)).data.result;
+      allow update, delete: if false;
+    }
+  }
+}

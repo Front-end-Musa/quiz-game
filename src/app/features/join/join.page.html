@@ -46,7 +46,7 @@
             autocapitalize="characters"
             autocomplete="off"
             spellcheck="false"
-            placeholder="DEMO22"
+            placeholder="ABC234"
             (blur)="normalizeCode()"
             [attr.aria-invalid]="!!fieldError('code')"
             [attr.aria-describedby]="
@@ -70,22 +70,27 @@
             "
         /></app-form-field>
         <button appButton type="submit" [disabled]="busy()">
-          {{ busy() ? 'Заходим…' : 'Я в игре!' }} <span aria-hidden="true">↗</span>
+          {{ busy() ? (firebase ? 'Ждём ведущего…' : 'Заходим…') : 'Я в игре!' }} <span aria-hidden="true">↗</span>
         </button>
         @if (error()) {
           <p role="alert">{{ error() }}</p>
         }
+        @if (!firebase) {
         <div class="demo-helper">
           <span>Хотите просто посмотреть?</span
           ><button class="text-button" type="button" (click)="useDemo()" [disabled]="busy()">
             Подставить демокод
           </button>
         </div>
+        }
       </form>
     }
     <p class="join-local-note">
-      Локальное демо: комната должна быть создана в этом браузере. Для знакомства доступна DEMO22.
-      Подключение с телефонов появится позже.
+      @if (firebase) {
+        Введите код от ведущего. Он должен держать страницу комнаты открытой. После обновления страницы ваше место сохранится.
+      } @else {
+        Локальное демо: комната должна быть создана в этом браузере. Для знакомства доступна DEMO22.
+      }
     </p>
   </section>
 </div>
